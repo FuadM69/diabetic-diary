@@ -1,17 +1,20 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
-import LoginForm from "./login-form";
 
-export default async function LoginPage() {
+export default async function ProtectedLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const supabase = await createClient();
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (user) {
-    redirect("/");
+  if (!user) {
+    redirect("/login");
   }
 
-  return <LoginForm />;
+  return <>{children}</>;
 }

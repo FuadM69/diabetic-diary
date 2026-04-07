@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/utils/supabase/client";
 
 type AppShellProps = {
   title: string;
@@ -9,23 +11,31 @@ type AppShellProps = {
 };
 
 export function AppShell({ title, children }: AppShellProps) {
-  const [appName, setAppName] = useState("Дневник диабетика");
+  const router = useRouter();
+  const [headerSubtitle, setHeaderSubtitle] = useState("Дневник диабетика");
+
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  };
 
   useEffect(() => {
-    const savedSettings = localStorage.getItem("diabetes_settings");
-    if (!savedSettings) {
-      return;
-    }
+    const loadUser = async () => {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-    try {
-      const parsedSettings: { appName?: string } = JSON.parse(savedSettings);
-      const nextAppName = parsedSettings.appName?.trim();
-      if (nextAppName) {
-        setAppName(nextAppName);
-      }
-    } catch {
-      setAppName("Дневник диабетика");
-    }
+      const fullName = user?.user_metadata?.full_name;
+      setHeaderSubtitle(
+        fullName != null && String(fullName).trim() !== ""
+          ? `Дневник ${fullName}`
+          : "Дневник диабетика"
+      );
+    };
+    loadUser();
   }, []);
 
   return (
@@ -35,10 +45,16 @@ export function AppShell({ title, children }: AppShellProps) {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-white/40">
-                {appName}
+                {headerSubtitle}
               </p>
               <h1 className="mt-1 text-xl font-semibold">{title}</h1>
             </div>
+            <button
+              onClick={handleLogout}
+              className="rounded-xl border border-white/20 px-3 py-2 text-xs text-white/80"
+            >
+              Выйти
+            </button>
           </div>
         </header>
 
