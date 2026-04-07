@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { getCurrentUser } from "@/lib/auth/getUser";
+import { getUserSettings } from "@/lib/db/settings";
 import { getExportCounts } from "@/lib/export/export-counts";
 import {
   getGlucoseRangeMeasuredAtLowerBound,
@@ -28,7 +29,10 @@ export default async function ExportPage({ searchParams }: ExportPageProps) {
 
   const params = searchParams ? await searchParams : {};
   const range = parseGlucoseRangeParam(params.range);
-  const bound = getGlucoseRangeMeasuredAtLowerBound(range);
+  const settings = await getUserSettings(user.id);
+  const bound = getGlucoseRangeMeasuredAtLowerBound(range, {
+    timezone: settings.timezone,
+  });
 
   const counts = await getExportCounts(user.id, bound);
   const combinedTotal = counts.glucose + counts.insulin + counts.meals;

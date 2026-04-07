@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { getCurrentUser } from "@/lib/auth/getUser";
 import { getInsulinEntries } from "@/lib/db/insulin";
+import { getUserSettings } from "@/lib/db/settings";
 import {
   getGlucoseRangeMeasuredAtLowerBound,
   parseGlucoseRangeParam,
@@ -34,7 +35,10 @@ export default async function InsulinPage({ searchParams }: InsulinPageProps) {
 
   const params = searchParams ? await searchParams : {};
   const range = parseGlucoseRangeParam(params.range);
-  const takenAtGte = getGlucoseRangeMeasuredAtLowerBound(range);
+  const settings = await getUserSettings(user.id);
+  const takenAtGte = getGlucoseRangeMeasuredAtLowerBound(range, {
+    timezone: settings.timezone,
+  });
 
   const entries = await getInsulinEntries(user.id, { takenAtGte });
   const queryPrefill = parseInsulinQueryPrefill(params);

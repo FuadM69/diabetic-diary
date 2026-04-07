@@ -14,6 +14,7 @@ import { filenameWithDate } from "@/lib/export/csv";
 import { getGlucoseEntries } from "@/lib/db/glucose";
 import { getInsulinEntries } from "@/lib/db/insulin";
 import { getMealEntries } from "@/lib/db/meals";
+import { getUserSettings } from "@/lib/db/settings";
 import {
   getGlucoseRangeMeasuredAtLowerBound,
   parseGlucoseRangeParam,
@@ -23,7 +24,6 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const kind = url.searchParams.get("kind");
   const range = parseGlucoseRangeParam(url.searchParams.get("range") ?? undefined);
-  const bound = getGlucoseRangeMeasuredAtLowerBound(range);
 
   const supabase = await createClient();
   const {
@@ -39,6 +39,10 @@ export async function GET(request: Request) {
   }
 
   const userId = user.id;
+  const settings = await getUserSettings(userId);
+  const bound = getGlucoseRangeMeasuredAtLowerBound(range, {
+    timezone: settings.timezone,
+  });
 
   const [glucose, insulin, meals] = await Promise.all([
     getGlucoseEntries(userId, { measuredAtGte: bound }),

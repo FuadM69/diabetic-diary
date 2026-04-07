@@ -20,7 +20,6 @@ export const runtime = "nodejs";
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const range = parseGlucoseRangeParam(url.searchParams.get("range") ?? undefined);
-  const bound = getGlucoseRangeMeasuredAtLowerBound(range);
 
   const supabase = await createClient();
   const {
@@ -36,12 +35,15 @@ export async function GET(request: Request) {
   }
 
   const userId = user.id;
+  const settings = await getUserSettings(userId);
+  const bound = getGlucoseRangeMeasuredAtLowerBound(range, {
+    timezone: settings.timezone,
+  });
 
-  const [glucoseEntries, insulinEntries, meals, settings] = await Promise.all([
+  const [glucoseEntries, insulinEntries, meals] = await Promise.all([
     getGlucoseEntries(userId, { measuredAtGte: bound }),
     getInsulinEntries(userId, { takenAtGte: bound }),
     getMealEntries(userId, { eatenAtGte: bound }),
-    getUserSettings(userId),
   ]);
 
   const glucoseStats = getGlucoseStats(glucoseEntries, settings);

@@ -36,14 +36,19 @@ export default async function HomePage() {
       ? displayNameRaw.trim()
       : user.email?.split("@")[0] ?? null;
 
-  const todayLower = getGlucoseRangeMeasuredAtLowerBound("today");
-  const sevenLower = getGlucoseRangeMeasuredAtLowerBound("7d");
-
-  const [latest, entries7d, settings] = await Promise.all([
+  const [latest, settings] = await Promise.all([
     getLatestGlucoseEntry(user.id),
-    getGlucoseEntries(user.id, { measuredAtGte: sevenLower }),
     getUserSettings(user.id),
   ]);
+
+  const todayLower = getGlucoseRangeMeasuredAtLowerBound("today", {
+    timezone: settings.timezone,
+  });
+  const sevenLower = getGlucoseRangeMeasuredAtLowerBound("7d");
+
+  const entries7d = await getGlucoseEntries(user.id, {
+    measuredAtGte: sevenLower,
+  });
 
   const todayEntries =
     typeof todayLower === "string"

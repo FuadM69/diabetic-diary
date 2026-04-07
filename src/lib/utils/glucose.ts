@@ -8,6 +8,10 @@ import {
   type UserSettings,
 } from "@/lib/types/glucose";
 import { datetimeLocalToUtcIso } from "@/lib/utils/datetime-local";
+import {
+  getLogRangeMeasuredAtLowerBound,
+  type LogRangeBoundOptions,
+} from "@/lib/utils/log-range-bounds";
 
 /** Reject obviously broken values (works for typical mmol/L and mg/dL scales). */
 export const GLUCOSE_INPUT_MAX = 600;
@@ -361,36 +365,17 @@ export function parseGlucoseRangeParam(
   return DEFAULT_GLUCOSE_RANGE;
 }
 
+export type { LogRangeBoundOptions };
+
 /**
- * Inclusive lower bound for `measured_at` (ISO), or `null` when no filter ("all").
- * "today" = start of current UTC calendar day; rolling windows use wall-clock ms from `now`.
+ * Inclusive lower bound for `measured_at` / `taken_at` / `eaten_at` (ISO UTC), or `null` for `"all"`.
+ * **"today"** uses the user’s timezone via `options.timezone` (see `log-range-bounds.ts`).
  */
 export function getGlucoseRangeMeasuredAtLowerBound(
   range: GlucoseRangeKey,
-  now: Date = new Date()
+  options?: LogRangeBoundOptions
 ): string | null {
-  if (range === "all") {
-    return null;
-  }
-
-  if (range === "today") {
-    const start = new Date(
-      Date.UTC(
-        now.getUTCFullYear(),
-        now.getUTCMonth(),
-        now.getUTCDate(),
-        0,
-        0,
-        0,
-        0
-      )
-    );
-    return start.toISOString();
-  }
-
-  const days = range === "7d" ? 7 : range === "14d" ? 14 : 30;
-  const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-  return cutoff.toISOString();
+  return getLogRangeMeasuredAtLowerBound(range, options);
 }
 
 export const GLUCOSE_RANGE_LABEL: Record<GlucoseRangeKey, string> = {

@@ -34,12 +34,12 @@ export default async function GlucosePage({ searchParams }: GlucosePageProps) {
 
   const params = searchParams ? await searchParams : {};
   const range = parseGlucoseRangeParam(params.range);
-  const measuredAtGte = getGlucoseRangeMeasuredAtLowerBound(range);
+  const settings = await getUserSettings(user.id);
+  const measuredAtGte = getGlucoseRangeMeasuredAtLowerBound(range, {
+    timezone: settings.timezone,
+  });
 
-  const [entries, settings] = await Promise.all([
-    getGlucoseEntries(user.id, { measuredAtGte }),
-    getUserSettings(user.id),
-  ]);
+  const entries = await getGlucoseEntries(user.id, { measuredAtGte });
 
   const stats = getGlucoseStats(entries, settings);
   const chartPoints = mapGlucoseEntriesToChartPoints(entries, settings);

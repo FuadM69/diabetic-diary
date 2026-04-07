@@ -11,6 +11,7 @@ type LogRangeFilterProps = {
 
 /**
  * URL chips for log date ranges (today / 7d / … / all). Same keys/labels as glucose.
+ * "today" is computed in the user’s `user_settings.timezone` (see `log-range-bounds.ts`).
  */
 export function LogRangeFilter({
   basePath,
