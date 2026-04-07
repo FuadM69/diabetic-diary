@@ -10,7 +10,7 @@ export default async function RootLayout({
 }) {
   const cookieStore = cookies();
 
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const {
     data: { user },
