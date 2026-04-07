@@ -61,6 +61,12 @@ export default function GlucosePage() {
     }, 2000);
   };
 
+  const handleDelete = (id: string) => {
+    const updatedEntries = entries.filter((entry) => entry.id !== id);
+    setEntries(updatedEntries);
+    localStorage.setItem("glucose_entries", JSON.stringify(updatedEntries));
+  };
+
   const chartData: GlucoseChartPoint[] = entries
     .slice(0, 10)
     .reverse()
@@ -137,7 +143,15 @@ export default function GlucosePage() {
                     key={entry.id}
                     className="rounded-3xl border border-white/10 bg-white/5 p-4"
                   >
-                    <p className="text-2xl font-semibold">{entry.value}</p>
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-2xl font-semibold">{entry.value}</p>
+                      <button
+                        onClick={() => handleDelete(entry.id)}
+                        className="rounded-xl border border-white/20 px-3 py-1 text-xs text-white/80"
+                      >
+                        Удалить
+                      </button>
+                    </div>
                     <p className="mt-1 text-sm text-white/60">
                       {new Date(entry.createdAt).toLocaleString("ru-RU")}
                     </p>
