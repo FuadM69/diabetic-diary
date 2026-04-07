@@ -1,6 +1,16 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 
 export default function HomePage() {
+  const [glucose, setGlucose] = useState("—");
+
+  useEffect(() => {
+    const savedGlucose = localStorage.getItem("glucose");
+    setGlucose(savedGlucose || "—");
+  }, []);
+
   return (
     <AppShell title="Главная">
       <div className="space-y-4">
@@ -15,7 +25,7 @@ export default function HomePage() {
         <section className="grid grid-cols-2 gap-3">
           <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
             <p className="text-sm text-white/60">Глюкоза</p>
-            <p className="mt-2 text-2xl font-semibold">—</p>
+            <p className="mt-2 text-2xl font-semibold">{glucose || "—"}</p>
           </div>
           <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
             <p className="text-sm text-white/60">Инсулин</p>
