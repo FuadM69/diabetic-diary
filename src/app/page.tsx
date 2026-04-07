@@ -10,28 +10,55 @@ type GlucoseEntry = {
   createdAt: string;
 };
 
+type SavedMeal = {
+  id: string;
+  createdAt: string;
+};
+
+type InsulinEntry = {
+  id: string;
+  createdAt: string;
+};
+
 export default function HomePage() {
   const [glucose, setGlucose] = useState("—");
+  const [mealsTodayCount, setMealsTodayCount] = useState("0");
+  const [insulinTodayCount, setInsulinTodayCount] = useState("0");
 
   useEffect(() => {
-    const savedEntries = localStorage.getItem("glucose_entries");
-
-    if (!savedEntries) {
-      setGlucose("—");
-      return;
-    }
-
-    try {
-      const parsedEntries: GlucoseEntry[] = JSON.parse(savedEntries);
-      if (!Array.isArray(parsedEntries) || parsedEntries.length === 0) {
-        setGlucose("—");
-        return;
+    const parseArray = <T,>(raw: string | null): T[] => {
+      if (!raw) {
+        return [];
       }
 
-      setGlucose(parsedEntries[0]?.value || "—");
-    } catch {
-      setGlucose("—");
-    }
+      try {
+        const parsed: T[] = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    };
+
+    const glucoseEntries = parseArray<GlucoseEntry>(
+      localStorage.getItem("glucose_entries")
+    );
+    const mealHistory = parseArray<SavedMeal>(localStorage.getItem("meal_history"));
+    const insulinEntries = parseArray<InsulinEntry>(
+      localStorage.getItem("insulin_entries")
+    );
+
+    setGlucose(glucoseEntries[0]?.value || "—");
+
+    const today = new Date().toDateString();
+    const mealsToday = mealHistory.filter(
+      (meal) => new Date(meal.createdAt).toDateString() === today
+    ).length;
+    const insulinToday = insulinEntries.filter(
+      (entry) => new Date(entry.createdAt).toDateString() === today
+    ).length;
+
+    setMealsTodayCount(String(mealsToday));
+    setInsulinTodayCount(String(insulinToday));
   }, []);
 
   return (
@@ -81,8 +108,12 @@ export default function HomePage() {
             <p className="mt-2 text-2xl font-semibold">{glucose || "—"}</p>
           </div>
           <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-            <p className="text-sm text-white/60">Инсулин</p>
-            <p className="mt-2 text-2xl font-semibold">—</p>
+            <p className="text-sm text-white/60">Приемы пищи сегодня</p>
+            <p className="mt-2 text-2xl font-semibold">{mealsTodayCount}</p>
+          </div>
+          <div className="col-span-2 rounded-3xl border border-white/10 bg-white/5 p-4">
+            <p className="text-sm text-white/60">Инсулин сегодня</p>
+            <p className="mt-2 text-2xl font-semibold">{insulinTodayCount}</p>
           </div>
         </section>
 
