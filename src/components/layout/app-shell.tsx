@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 type AppShellProps = {
@@ -6,6 +9,25 @@ type AppShellProps = {
 };
 
 export function AppShell({ title, children }: AppShellProps) {
+  const [appName, setAppName] = useState("Дневник диабетика");
+
+  useEffect(() => {
+    const savedSettings = localStorage.getItem("diabetes_settings");
+    if (!savedSettings) {
+      return;
+    }
+
+    try {
+      const parsedSettings: { appName?: string } = JSON.parse(savedSettings);
+      const nextAppName = parsedSettings.appName?.trim();
+      if (nextAppName) {
+        setAppName(nextAppName);
+      }
+    } catch {
+      setAppName("Дневник диабетика");
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-neutral-950 text-white">
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-black">
@@ -13,7 +35,7 @@ export function AppShell({ title, children }: AppShellProps) {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-white/40">
-                Дневник диабетика
+                {appName}
               </p>
               <h1 className="mt-1 text-xl font-semibold">{title}</h1>
             </div>
