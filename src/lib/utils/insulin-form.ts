@@ -1,3 +1,4 @@
+import { datetimeLocalInUserTimezoneToUtcIso } from "@/lib/utils/datetime-local-tz";
 import { parseGlucoseEntryId } from "@/lib/utils/glucose";
 import {
   INSULIN_ENTRY_TYPES,
@@ -39,19 +40,14 @@ function normalizeOptionalText(
   return t.length > 0 ? t : null;
 }
 
-function parseTakenAt(raw: FormDataEntryValue | null): string | null {
-  if (raw === null || typeof raw !== "string") {
-    return null;
-  }
-  const s = raw.trim();
-  if (!s) {
-    return null;
-  }
-  const d = new Date(s);
-  if (Number.isNaN(d.getTime())) {
-    return null;
-  }
-  return d.toISOString();
+function parseTakenAt(
+  raw: FormDataEntryValue | null,
+  savedTimezone: string | null
+): { ok: true; iso: string } | { ok: false; message: string } {
+  return datetimeLocalInUserTimezoneToUtcIso(raw, savedTimezone, {
+    empty: "Укажите дату и время введения.",
+    invalidFormat: "Некорректная дата или время.",
+  });
 }
 
 /**
@@ -102,13 +98,13 @@ function parseEntryType(raw: FormDataEntryValue | null):
   return { ok: true, value: v as InsulinEntryType };
 }
 
-function parseInsulinFormFields(formData: FormData): ParseInsulinCreateFormResult {
-  const takenAt = parseTakenAt(formData.get("taken_at"));
-  if (!takenAt) {
-    return {
-      ok: false,
-      message: "Укажите дату и время введения.",
-    };
+function parseInsulinFormFields(
+  formData: FormData,
+  savedTimezone: string | null
+): ParseInsulinCreateFormResult {
+  const takenP = parseTakenAt(formData.get("taken_at"), savedTimezone);
+  if (!takenP.ok) {
+    return { ok: false, message: takenP.message };
   }
 
   const typeParsed = parseEntryType(formData.get("entry_type"));
@@ -124,7 +120,7 @@ function parseInsulinFormFields(formData: FormData): ParseInsulinCreateFormResul
   return {
     ok: true,
     data: {
-      taken_at: takenAt,
+      taken_at: takenP.iso,
       entry_type: typeParsed.value,
       units: unitsParsed.value,
       insulin_name: normalizeOptionalText(formData.get("insulin_name")),
@@ -189,21 +185,23 @@ export function parseInsulinQueryPrefill(
 
 /** Validate FormData for creating an insulin entry (server actions). */
 export function parseInsulinCreateForm(
-  formData: FormData
+  formData: FormData,
+  savedTimezone: string | null
 ): ParseInsulinCreateFormResult {
-  return parseInsulinFormFields(formData);
+  return parseInsulinFormFields(formData, savedTimezone);
 }
 
 /** Validate FormData for updating an insulin entry (server actions). */
 export function parseInsulinUpdateForm(
-  formData: FormData
+  formData: FormData,
+  savedTimezone: string | null
 ): ParseInsulinUpdateFormResult {
   const idParsed = parseGlucoseEntryId(formData.get("entryId"));
   if (!idParsed.ok) {
     return { ok: false, message: idParsed.message };
   }
 
-  const rest = parseInsulinFormFields(formData);
+  const rest = parseInsulinFormFields(formData, savedTimezone);
   if (!rest.ok) {
     return rest;
   }

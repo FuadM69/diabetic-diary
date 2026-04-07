@@ -7,7 +7,7 @@ import {
   type GlucoseStatus,
   type UserSettings,
 } from "@/lib/types/glucose";
-import { datetimeLocalToUtcIso } from "@/lib/utils/datetime-local";
+import { datetimeLocalInUserTimezoneToUtcIso } from "@/lib/utils/datetime-local-tz";
 import {
   getLogRangeMeasuredAtLowerBound,
   type LogRangeBoundOptions,
@@ -82,25 +82,20 @@ export type ParseGlucoseMeasuredAtResult =
   | { ok: false; message: string };
 
 /**
- * Required `measured_at` from FormData (`datetime-local`). Returns UTC ISO for DB / Supabase.
+ * Required `measured_at` from FormData (`datetime-local`), interpreted in `user_settings.timezone`.
  */
 export function parseGlucoseMeasuredAt(
-  raw: FormDataEntryValue | null
+  raw: FormDataEntryValue | null,
+  savedUserTimezone: string | null
 ): ParseGlucoseMeasuredAtResult {
-  if (raw === null || typeof raw !== "string") {
-    return { ok: false, message: "Укажите дату и время замера." };
+  const r = datetimeLocalInUserTimezoneToUtcIso(raw, savedUserTimezone, {
+    empty: "Укажите дату и время замера.",
+    invalidFormat: "Укажите корректную дату и время замера.",
+  });
+  if (!r.ok) {
+    return { ok: false, message: r.message };
   }
-  if (raw.trim() === "") {
-    return { ok: false, message: "Укажите дату и время замера." };
-  }
-  const iso = datetimeLocalToUtcIso(raw);
-  if (iso === null) {
-    return {
-      ok: false,
-      message: "Укажите корректную дату и время замера.",
-    };
-  }
-  return { ok: true, iso };
+  return { ok: true, iso: r.iso };
 }
 
 export const GLUCOSE_NOTE_MAX_LENGTH = 2000;

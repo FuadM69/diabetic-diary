@@ -4,11 +4,17 @@ import { getCurrentUser } from "@/lib/auth/getUser";
 import { getGlucoseEntries } from "@/lib/db/glucose";
 import { getUserSettings } from "@/lib/db/settings";
 import {
+  buildLogRangeDebugPayload,
+  isDiaryLogRangeDebugEnabled,
+  logLogRangeDebugToConsole,
+} from "@/lib/utils/log-range-bounds";
+import {
   getGlucoseRangeMeasuredAtLowerBound,
   getGlucoseStats,
   mapGlucoseEntriesToChartPoints,
   parseGlucoseRangeParam,
 } from "@/lib/utils/glucose";
+import { GlucoseRangeDebugPanel } from "./_components/glucose-range-debug-panel";
 import { GlucoseChart } from "./_components/GlucoseChart";
 import { GlucoseForm } from "./_components/glucose-form";
 import { GlucoseList } from "./_components/glucose-list";
@@ -35,11 +41,27 @@ export default async function GlucosePage({ searchParams }: GlucosePageProps) {
   const params = searchParams ? await searchParams : {};
   const range = parseGlucoseRangeParam(params.range);
   const settings = await getUserSettings(user.id);
-  const measuredAtGte = getGlucoseRangeMeasuredAtLowerBound(range, {
-    timezone: settings.timezone,
-  });
+  const boundOptions = { timezone: settings.timezone };
+  const measuredAtGte = getGlucoseRangeMeasuredAtLowerBound(
+    range,
+    boundOptions
+  );
 
   const entries = await getGlucoseEntries(user.id, { measuredAtGte });
+
+  const rangeDebugPayload =
+    isDiaryLogRangeDebugEnabled() ?
+      buildLogRangeDebugPayload(
+        range,
+        boundOptions,
+        measuredAtGte,
+        entries.map((e) => e.measured_at)
+      )
+    : null;
+
+  if (rangeDebugPayload) {
+    logLogRangeDebugToConsole("glucose-page", rangeDebugPayload);
+  }
 
   const stats = getGlucoseStats(entries, settings);
   const chartPoints = mapGlucoseEntriesToChartPoints(entries, settings);
@@ -57,6 +79,10 @@ export default async function GlucosePage({ searchParams }: GlucosePageProps) {
             . Записи ниже подсвечиваются относительно этих границ.
           </p>
         </header>
+
+        {rangeDebugPayload ? (
+          <GlucoseRangeDebugPanel payload={rangeDebugPayload} />
+        ) : null}
 
         <section
           id="add-glucose"

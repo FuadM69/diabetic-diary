@@ -4,6 +4,9 @@
  * **"today"** uses the user’s calendar day in `user_settings.timezone` when valid; otherwise the
  * runtime default IANA zone from `Intl` (often UTC on serverless — users should set timezone in settings).
  *
+ * **Saved values like `UTC+3` / `GMT+3` are not valid IANA IDs for `Intl`** on Node/V8; we map them
+ * to fixed-offset `Etc/GMT±N` (see `tryMapUtcOffsetLabelToIana`).
+ *
  * Rolling windows **7d / 14d / 30d** stay as UTC ms offsets from `now` (unchanged).
  */
 import type { GlucoseRangeKey } from "@/lib/types/glucose";
@@ -15,7 +18,16 @@ export type LogRangeBoundOptions = {
   now?: Date;
 };
 
-function readZonedCalendarParts(date: Date, timeZone: string) {
+/** Dev or `DIARY_LOG_RANGE_DEBUG=1` on the server (no `NEXT_PUBLIC_` — not exposed to client bundles by default). */
+export function isDiaryLogRangeDebugEnabled(): boolean {
+  return (
+    process.env.DIARY_LOG_RANGE_DEBUG === "1" ||
+    process.env.NODE_ENV === "development"
+  );
+}
+
+/** Wall-clock calendar parts for an instant in an IANA time zone (used by log ranges and datetime-local → UTC). */
+export function readZonedWallClockParts(date: Date, timeZone: string) {
   const dtf = new Intl.DateTimeFormat("en-US", {
     timeZone,
     hour12: false,
@@ -58,7 +70,7 @@ function compareZonedDayToTarget(
   targetM: number,
   targetD: number
 ): number {
-  const p = readZonedCalendarParts(date, timeZone);
+  const p = readZonedWallClockParts(date, timeZone);
   return (
     calendarSortKey(p.year, p.month, p.day) -
     calendarSortKey(targetY, targetM, targetD)
@@ -68,21 +80,25 @@ function compareZonedDayToTarget(
 /**
  * UTC instant when the calendar date in `timeZone` first becomes the same local calendar day as `now`
  * (local midnight / start of that day in that zone).
+ *
+ * Brackets around UTC noon on the same **Gregorian** Y-M-D as the zoned “today” (±36h), then binary search.
+ * Example: `Europe/Moscow`, local date 2026-04-08 → lower bound `2026-04-07T21:00:00.000Z` (MSK = UTC+3).
  */
 export function startOfZonedCalendarDayUtc(now: Date, timeZone: string): Date {
-  const p = readZonedCalendarParts(now, timeZone);
+  const p = readZonedWallClockParts(now, timeZone);
   const Y = p.year;
   const M = p.month;
   const D = p.day;
 
-  let lo = now.getTime() - 3 * 86_400_000;
-  let hi = now.getTime() + 3 * 86_400_000;
+  const utcNoonOnGregorianDate = Date.UTC(Y, M - 1, D, 12, 0, 0, 0);
+  let lo = utcNoonOnGregorianDate - 36 * 3600000;
+  let hi = utcNoonOnGregorianDate + 36 * 3600000;
 
   while (compareZonedDayToTarget(new Date(lo), timeZone, Y, M, D) >= 0) {
-    lo -= 86_400_000;
+    lo -= 3600000;
   }
   while (compareZonedDayToTarget(new Date(hi), timeZone, Y, M, D) < 0) {
-    hi += 86_400_000;
+    hi += 3600000;
   }
 
   while (lo + 1 < hi) {
@@ -111,15 +127,112 @@ export function isLikelyValidIanaTimeZone(timeZone: string): boolean {
 }
 
 /**
- * Prefer saved IANA zone; otherwise host/runtime default from `Intl` (documented fallback for SSR).
+ * `UTC+3` / `GMT-5` style labels are not valid `timeZone` values in V8; map to fixed-hour `Etc/GMT±N`.
+ * IANA `Etc/GMT` signs are inverted vs “UTC±”: `UTC+3` → `Etc/GMT-3`.
+ */
+export function tryMapUtcOffsetLabelToIana(input: string): string | null {
+  const compact = input.trim().replace(/\s+/g, " ");
+  const m = compact.match(/^(?:UTC|GMT)\s*([+-])\s*(\d{1,2})(?::(\d{2}))?$/i);
+  if (!m) {
+    return null;
+  }
+  const hours = Number.parseInt(m[2], 10);
+  const mins = m[3] != null ? Number.parseInt(m[3], 10) : 0;
+  if (
+    !Number.isFinite(hours) ||
+    hours < 0 ||
+    hours > 14 ||
+    !Number.isFinite(mins) ||
+    mins < 0 ||
+    mins > 59
+  ) {
+    return null;
+  }
+  if (mins !== 0) {
+    return null;
+  }
+  const sign = m[1];
+  const ianaSign = sign === "+" ? "-" : "+";
+  return `Etc/GMT${ianaSign}${hours}`;
+}
+
+export type LogRangeTimezoneResolution =
+  | "saved_iana"
+  | "mapped_utc_offset"
+  | "host_fallback";
+
+export type LogRangeTimezoneInfo = {
+  savedRaw: string | null;
+  savedTrimmed: string | null;
+  savedAcceptedByIntl: boolean;
+  mappedFromOffsetLabel: string | null;
+  resolvedTimeZone: string;
+  resolution: LogRangeTimezoneResolution;
+  hostDefaultTimeZone: string;
+};
+
+export function explainLogRangeTimeZone(
+  savedTimezone: string | null | undefined
+): LogRangeTimezoneInfo {
+  const hostDefaultTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const savedRaw =
+    savedTimezone === undefined || savedTimezone === null
+      ? null
+      : savedTimezone;
+  const savedTrimmed =
+    typeof savedTimezone === "string" ? savedTimezone.trim() : null;
+  if (!savedTrimmed) {
+    return {
+      savedRaw,
+      savedTrimmed: null,
+      savedAcceptedByIntl: false,
+      mappedFromOffsetLabel: null,
+      resolvedTimeZone: hostDefaultTimeZone,
+      resolution: "host_fallback",
+      hostDefaultTimeZone,
+    };
+  }
+  if (isLikelyValidIanaTimeZone(savedTrimmed)) {
+    return {
+      savedRaw,
+      savedTrimmed,
+      savedAcceptedByIntl: true,
+      mappedFromOffsetLabel: null,
+      resolvedTimeZone: savedTrimmed,
+      resolution: "saved_iana",
+      hostDefaultTimeZone,
+    };
+  }
+  const mapped = tryMapUtcOffsetLabelToIana(savedTrimmed);
+  if (mapped && isLikelyValidIanaTimeZone(mapped)) {
+    return {
+      savedRaw,
+      savedTrimmed,
+      savedAcceptedByIntl: false,
+      mappedFromOffsetLabel: mapped,
+      resolvedTimeZone: mapped,
+      resolution: "mapped_utc_offset",
+      hostDefaultTimeZone,
+    };
+  }
+  return {
+    savedRaw,
+    savedTrimmed,
+    savedAcceptedByIntl: false,
+    mappedFromOffsetLabel: mapped,
+    resolvedTimeZone: hostDefaultTimeZone,
+    resolution: "host_fallback",
+    hostDefaultTimeZone,
+  };
+}
+
+/**
+ * Prefer saved IANA zone, or mapped `UTC±N` / `GMT±N`, else host/runtime default from `Intl`.
  */
 export function resolveLogRangeTimeZone(
   savedTimezone: string | null | undefined
 ): string {
-  if (savedTimezone && isLikelyValidIanaTimeZone(savedTimezone)) {
-    return savedTimezone.trim();
-  }
-  return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return explainLogRangeTimeZone(savedTimezone).resolvedTimeZone;
 }
 
 /**
@@ -143,4 +256,63 @@ export function getLogRangeMeasuredAtLowerBound(
   const days = range === "7d" ? 7 : range === "14d" ? 14 : 30;
   const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
   return cutoff.toISOString();
+}
+
+export type LogRangeDebugPayload = {
+  range: GlucoseRangeKey;
+  serverNowIso: string;
+  zonedNowInResolvedZone: ReturnType<typeof readZonedWallClockParts>;
+  timezone: LogRangeTimezoneInfo;
+  /** Lower bound for the **active** URL range. */
+  activeRangeLowerBoundIso: string | null;
+  /** Always the “today” bound for the same clock + timezone options (handy when range ≠ today). */
+  todayLowerBoundIso: string | null;
+  /** Value passed to `getGlucoseEntries` / `.gte("measured_at", …)`. */
+  queryMeasuredAtGte: string | null;
+  loadedMeasuredAtValues: string[];
+  hints: string[];
+};
+
+export function buildLogRangeDebugPayload(
+  range: GlucoseRangeKey,
+  options: LogRangeBoundOptions | undefined,
+  queryMeasuredAtGte: string | null,
+  loadedMeasuredAtValues: string[]
+): LogRangeDebugPayload {
+  const now = options?.now ?? new Date();
+  const tzInfo = explainLogRangeTimeZone(options?.timezone ?? null);
+  const activeRangeLowerBoundIso = getLogRangeMeasuredAtLowerBound(range, options);
+  const todayLowerBoundIso = getLogRangeMeasuredAtLowerBound("today", options);
+  const zonedNowInResolvedZone = readZonedWallClockParts(
+    now,
+    tzInfo.resolvedTimeZone
+  );
+
+  const hints: string[] = [
+    "mapped_utc_offset: labels like UTC+3/GMT+3 are mapped to IANA Etc/GMT-* (Intl does not accept UTC+3 as a timeZone id).",
+    "host_fallback: saved timezone is not a valid IANA id and was not mapped; using the server host zone (often UTC on Netlify).",
+    "If entries still look wrong, check measured_at: datetime-local is parsed on the server in the server default zone unless the app uses the user zone when saving.",
+  ];
+
+  return {
+    range,
+    serverNowIso: now.toISOString(),
+    zonedNowInResolvedZone,
+    timezone: tzInfo,
+    activeRangeLowerBoundIso,
+    todayLowerBoundIso,
+    queryMeasuredAtGte,
+    loadedMeasuredAtValues,
+    hints,
+  };
+}
+
+export function logLogRangeDebugToConsole(
+  scope: string,
+  payload: LogRangeDebugPayload
+): void {
+  if (!isDiaryLogRangeDebugEnabled()) {
+    return;
+  }
+  console.log(`[diary:log-range:${scope}]`, JSON.stringify(payload, null, 2));
 }

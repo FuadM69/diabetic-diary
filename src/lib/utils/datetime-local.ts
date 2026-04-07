@@ -24,7 +24,8 @@ export function utcIsoToDatetimeLocalValue(iso: string): string {
 }
 
 /**
- * Parses a `datetime-local` value (local time, no offset) to UTC ISO for storage.
+ * Parses a `datetime-local` value using the **runtime default timezone** (e.g. server = often UTC).
+ * Do **not** use for persisting user-entered diary times — use `datetime-local-tz.ts` instead.
  * Returns `null` if empty or not a valid date.
  */
 export function datetimeLocalToUtcIso(local: string): string | null {

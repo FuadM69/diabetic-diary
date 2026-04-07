@@ -130,7 +130,10 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
       <section className={SURFACE_CARD}>
         <h2 className="text-base font-medium text-white">Часовой пояс</h2>
         <p className="mt-1 text-xs text-white/50">
-          Произвольная строка (например, Europe/Moscow или UTC+3).
+          Лучше IANA: <span className="text-white/65">Europe/Moscow</span>. Можно{" "}
+          <span className="text-white/65">UTC+3</span> /{" "}
+          <span className="text-white/65">GMT+3</span> — приложение приведёт к фиксированному
+          поясу Etc/GMT-*.
         </p>
         <label className="mt-4 block text-sm text-white/70">
           Часовой пояс

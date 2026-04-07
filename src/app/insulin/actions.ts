@@ -6,6 +6,7 @@ import {
   deleteInsulinEntry,
   updateInsulinEntry,
 } from "@/lib/db/insulin";
+import { getUserSettings } from "@/lib/db/settings";
 import { createClient } from "@/lib/supabase/server";
 import { parseGlucoseEntryId } from "@/lib/utils/glucose";
 import {
@@ -21,11 +22,6 @@ export type InsulinActionResult = {
 export async function createInsulinEntryAction(
   formData: FormData
 ): Promise<InsulinActionResult> {
-  const parsed = parseInsulinCreateForm(formData);
-  if (!parsed.ok) {
-    return { success: false, error: parsed.message };
-  }
-
   const supabase = await createClient();
   const {
     data: { user },
@@ -42,6 +38,12 @@ export async function createInsulinEntryAction(
 
   if (!user) {
     return { success: false, error: "Нужно войти в аккаунт." };
+  }
+
+  const settings = await getUserSettings(user.id);
+  const parsed = parseInsulinCreateForm(formData, settings.timezone);
+  if (!parsed.ok) {
+    return { success: false, error: parsed.message };
   }
 
   const result = await createInsulinEntry(user.id, parsed.data);
@@ -62,11 +64,6 @@ export async function createInsulinEntryAction(
 export async function updateInsulinEntryAction(
   formData: FormData
 ): Promise<InsulinActionResult> {
-  const parsed = parseInsulinUpdateForm(formData);
-  if (!parsed.ok) {
-    return { success: false, error: parsed.message };
-  }
-
   const supabase = await createClient();
   const {
     data: { user },
@@ -83,6 +80,12 @@ export async function updateInsulinEntryAction(
 
   if (!user) {
     return { success: false, error: "Нужно войти в аккаунт." };
+  }
+
+  const settings = await getUserSettings(user.id);
+  const parsed = parseInsulinUpdateForm(formData, settings.timezone);
+  if (!parsed.ok) {
+    return { success: false, error: parsed.message };
   }
 
   const result = await updateInsulinEntry(user.id, parsed.data);

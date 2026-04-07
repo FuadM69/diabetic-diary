@@ -6,6 +6,7 @@ import {
   insertGlucoseEntry,
   updateGlucoseEntry,
 } from "@/lib/db/glucose";
+import { getUserSettings } from "@/lib/db/settings";
 import { createClient } from "@/lib/supabase/server";
 import {
   parseGlucoseEntryId,
@@ -46,6 +47,8 @@ export async function submitGlucoseEntry(
     return { success: false, error: "Нужно войти в аккаунт." };
   }
 
+  const settings = await getUserSettings(user.id);
+
   const noteParsed = parseGlucoseNote(formData.get("note"));
   if (!noteParsed.ok) {
     return { success: false, error: noteParsed.message };
@@ -55,7 +58,10 @@ export async function submitGlucoseEntry(
     return { success: false, error: sourceParsed.message };
   }
 
-  const measuredAtParsed = parseGlucoseMeasuredAt(formData.get("measuredAt"));
+  const measuredAtParsed = parseGlucoseMeasuredAt(
+    formData.get("measuredAt"),
+    settings.timezone
+  );
   if (!measuredAtParsed.ok) {
     return { success: false, error: measuredAtParsed.message };
   }
@@ -112,12 +118,17 @@ export async function editGlucoseEntryAction(
     return { success: false, error: "Нужно войти в аккаунт." };
   }
 
+  const settings = await getUserSettings(user.id);
+
   const noteParsed = parseGlucoseNote(formData.get("note"));
   if (!noteParsed.ok) {
     return { success: false, error: noteParsed.message };
   }
 
-  const measuredAtParsed = parseGlucoseMeasuredAt(formData.get("measuredAt"));
+  const measuredAtParsed = parseGlucoseMeasuredAt(
+    formData.get("measuredAt"),
+    settings.timezone
+  );
   if (!measuredAtParsed.ok) {
     return { success: false, error: measuredAtParsed.message };
   }

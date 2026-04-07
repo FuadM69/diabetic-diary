@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createMealEntry } from "@/lib/db/meals";
+import { getUserSettings } from "@/lib/db/settings";
 import { createClient } from "@/lib/supabase/server";
 import { parseMealCreationForm } from "@/lib/utils/meal-form";
 
@@ -13,11 +14,6 @@ export type MealActionResult = {
 export async function createMealEntryAction(
   formData: FormData
 ): Promise<MealActionResult> {
-  const parsed = parseMealCreationForm(formData);
-  if (!parsed.ok) {
-    return { success: false, error: parsed.message };
-  }
-
   const supabase = await createClient();
   const {
     data: { user },
@@ -34,6 +30,12 @@ export async function createMealEntryAction(
 
   if (!user) {
     return { success: false, error: "Нужно войти в аккаунт." };
+  }
+
+  const settings = await getUserSettings(user.id);
+  const parsed = parseMealCreationForm(formData, settings.timezone);
+  if (!parsed.ok) {
+    return { success: false, error: parsed.message };
   }
 
   const result = await createMealEntry(user.id, parsed.data);

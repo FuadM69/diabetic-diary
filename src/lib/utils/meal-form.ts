@@ -3,6 +3,7 @@ import type {
   MealCreateItemInput,
   MealTypeKey,
 } from "@/lib/types/meal";
+import { datetimeLocalInUserTimezoneToUtcIso } from "@/lib/utils/datetime-local-tz";
 import { MEAL_TYPE_KEYS } from "@/lib/types/meal";
 
 export type ParseMealFormResult =
@@ -17,19 +18,13 @@ const GRAMS_MAX = 20_000;
 const NOTE_MAX = 500;
 
 function parseEatenAt(
-  raw: FormDataEntryValue | null
+  raw: FormDataEntryValue | null,
+  savedTimezone: string | null
 ): { ok: true; iso: string } | { ok: false; message: string } {
-  if (raw === null || typeof raw !== "string" || raw.trim() === "") {
-    return {
-      ok: false,
-      message: "Укажите дату и время приёма пищи.",
-    };
-  }
-  const d = new Date(raw);
-  if (Number.isNaN(d.getTime())) {
-    return { ok: false, message: "Некорректная дата или время." };
-  }
-  return { ok: true, iso: d.toISOString() };
+  return datetimeLocalInUserTimezoneToUtcIso(raw, savedTimezone, {
+    empty: "Укажите дату и время приёма пищи.",
+    invalidFormat: "Некорректная дата или время.",
+  });
 }
 
 function parseMealType(
@@ -68,8 +63,11 @@ function isUuid(id: string): boolean {
   return UUID_RE.test(id);
 }
 
-export function parseMealCreationForm(formData: FormData): ParseMealFormResult {
-  const eaten = parseEatenAt(formData.get("eaten_at"));
+export function parseMealCreationForm(
+  formData: FormData,
+  savedTimezone: string | null
+): ParseMealFormResult {
+  const eaten = parseEatenAt(formData.get("eaten_at"), savedTimezone);
   if (!eaten.ok) {
     return { ok: false, message: eaten.message };
   }

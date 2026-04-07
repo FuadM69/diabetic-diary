@@ -8,6 +8,7 @@
  */
 import type { GlucoseEntry } from "@/lib/types/glucose";
 import { createClient } from "@/lib/supabase/server";
+import { isDiaryLogRangeDebugEnabled } from "@/lib/utils/log-range-bounds";
 
 const GLUCOSE_SELECT =
   "id, user_id, glucose_value, measured_at, source, note";
@@ -45,6 +46,12 @@ export async function getGlucoseEntries(
 
   const from = options?.measuredAtGte;
   if (typeof from === "string" && from.length > 0) {
+    if (isDiaryLogRangeDebugEnabled()) {
+      console.log(
+        "[glucose][getGlucoseEntries] .gte(measured_at, bound)",
+        from
+      );
+    }
     q = q.gte("measured_at", from);
   }
 
