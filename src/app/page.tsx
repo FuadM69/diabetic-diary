@@ -3,12 +3,34 @@
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 
+type GlucoseEntry = {
+  id: string;
+  value: string;
+  createdAt: string;
+};
+
 export default function HomePage() {
   const [glucose, setGlucose] = useState("—");
 
   useEffect(() => {
-    const savedGlucose = localStorage.getItem("glucose");
-    setGlucose(savedGlucose || "—");
+    const savedEntries = localStorage.getItem("glucose_entries");
+
+    if (!savedEntries) {
+      setGlucose("—");
+      return;
+    }
+
+    try {
+      const parsedEntries: GlucoseEntry[] = JSON.parse(savedEntries);
+      if (!Array.isArray(parsedEntries) || parsedEntries.length === 0) {
+        setGlucose("—");
+        return;
+      }
+
+      setGlucose(parsedEntries[0]?.value || "—");
+    } catch {
+      setGlucose("—");
+    }
   }, []);
 
   return (
