@@ -5,10 +5,14 @@ import { AppShell } from "@/components/layout/app-shell";
 
 export default function GlucosePage() {
   const [glucose, setGlucose] = useState("");
+  const [isSaved, setIsSaved] = useState(false);
 
   const handleSave = () => {
     localStorage.setItem("glucose", glucose);
-    alert("Сохранено");
+    setIsSaved(true);
+    setTimeout(() => {
+      setIsSaved(false);
+    }, 2000);
   };
 
   return (
@@ -41,6 +45,7 @@ export default function GlucosePage() {
             >
               Сохранить
             </button>
+            {isSaved && <p className="text-sm text-white/70">Сохранено</p>}
           </div>
         </section>
       </div>
