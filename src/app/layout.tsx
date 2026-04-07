@@ -1,5 +1,5 @@
 import "./globals.css";
-import { createServerClient } from "@/utils/supabase/server";
+import { createClient } from "@/utils/supabase/server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -10,7 +10,7 @@ export default async function RootLayout({
 }) {
   const cookieStore = cookies();
 
-  const supabase = createServerClient();
+  const supabase = createClient();
 
   const {
     data: { user },

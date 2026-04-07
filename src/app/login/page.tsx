@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
-import { createClient } from "@/utils/supabase/client";
-import { createServerClient } from "@/utils/supabase/server";
+import { createClient as createBrowserClient } from "@/utils/supabase/client";
+import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 
 export default async function LoginPage() {
-  const supabase = createServerClient();
+  const supabase = createClient();
 
   const {
     data: { user },
@@ -19,7 +19,7 @@ export default async function LoginPage() {
   // keep existing UI below
 
   const router = useRouter();
-  const supabaseClient = createClient();
+  const supabaseClient = createBrowserClient();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
