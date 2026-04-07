@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 
 type DiabetesSettings = {
+  appName: string;
   breadUnitGrams: string;
   insulinBreakfastRatio: string;
   insulinLunchRatio: string;
@@ -16,6 +17,7 @@ type DiabetesSettings = {
 };
 
 const defaultSettings: DiabetesSettings = {
+  appName: "Дневник диабетика",
   breadUnitGrams: "12",
   insulinBreakfastRatio: "1.5",
   insulinLunchRatio: "1.0",
@@ -77,6 +79,20 @@ export default function SettingsPage() {
   return (
     <AppShell title="Настройки">
       <div className="space-y-4">
+        <section className="rounded-3xl border border-white/10 bg-white/5 p-4">
+          <h2 className="text-base font-medium text-white">Приложение</h2>
+          <label className="mt-3 block text-sm text-white/70">
+            Название приложения
+            <input
+              type="text"
+              value={settings.appName}
+              onChange={(event) => handleChange("appName", event.target.value)}
+              placeholder="например, Дневник Фуада"
+              className={inputClassName}
+            />
+          </label>
+        </section>
+
         <section className="rounded-3xl border border-white/10 bg-white/5 p-4">
           <h2 className="text-base font-medium text-white">ХЕ</h2>
           <label className="mt-3 block text-sm text-white/70">
