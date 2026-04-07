@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import {
   LineChart,
@@ -26,6 +26,8 @@ export default function GlucosePage() {
   const [glucose, setGlucose] = useState("");
   const [isSaved, setIsSaved] = useState(false);
   const [entries, setEntries] = useState<GlucoseEntry[]>([]);
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const savedEntries = localStorage.getItem("glucose_entries");
@@ -45,13 +47,26 @@ export default function GlucosePage() {
   }, []);
 
   const handleSave = () => {
-    const newEntry: GlucoseEntry = {
-      id: Date.now().toString(),
-      value: glucose,
-      createdAt: new Date().toISOString(),
-    };
+    if (!glucose) {
+      return;
+    }
 
-    const updatedEntries = [newEntry, ...entries];
+    let updatedEntries: GlucoseEntry[];
+
+    if (editingEntryId) {
+      updatedEntries = entries.map((entry) =>
+        entry.id === editingEntryId ? { ...entry, value: glucose } : entry
+      );
+      setEditingEntryId(null);
+    } else {
+      const newEntry: GlucoseEntry = {
+        id: Date.now().toString(),
+        value: glucose,
+        createdAt: new Date().toISOString(),
+      };
+      updatedEntries = [newEntry, ...entries];
+    }
+
     localStorage.setItem("glucose_entries", JSON.stringify(updatedEntries));
     setEntries(updatedEntries);
     setGlucose("");
@@ -65,6 +80,22 @@ export default function GlucosePage() {
     const updatedEntries = entries.filter((entry) => entry.id !== id);
     setEntries(updatedEntries);
     localStorage.setItem("glucose_entries", JSON.stringify(updatedEntries));
+
+    if (editingEntryId === id) {
+      setEditingEntryId(null);
+      setGlucose("");
+    }
+  };
+
+  const handleEdit = (entry: GlucoseEntry) => {
+    setEditingEntryId(entry.id);
+    setGlucose(entry.value);
+    inputRef.current?.focus();
+  };
+
+  const handleCancelEdit = () => {
+    setEditingEntryId(null);
+    setGlucose("");
   };
 
   const chartData: GlucoseChartPoint[] = entries
@@ -93,6 +124,7 @@ export default function GlucosePage() {
                   Уровень глюкозы
                 </label>
                 <input
+                  ref={inputRef}
                   id="glucose-value"
                   type="number"
                   inputMode="decimal"
@@ -108,8 +140,16 @@ export default function GlucosePage() {
                 onClick={handleSave}
                 className="w-full rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black"
               >
-                Сохранить
+                {editingEntryId ? "Сохранить изменения" : "Сохранить"}
               </button>
+              {editingEntryId && (
+                <button
+                  onClick={handleCancelEdit}
+                  className="text-sm text-white/70"
+                >
+                  Отмена
+                </button>
+              )}
               {isSaved && <p className="text-sm text-white/70">Сохранено</p>}
             </div>
           </section>
@@ -145,12 +185,20 @@ export default function GlucosePage() {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <p className="text-2xl font-semibold">{entry.value}</p>
-                      <button
-                        onClick={() => handleDelete(entry.id)}
-                        className="rounded-xl border border-white/20 px-3 py-1 text-xs text-white/80"
-                      >
-                        Удалить
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleEdit(entry)}
+                          className="rounded-xl border border-white/20 px-3 py-1 text-xs text-white/80"
+                        >
+                          Редактировать
+                        </button>
+                        <button
+                          onClick={() => handleDelete(entry.id)}
+                          className="rounded-xl border border-white/20 px-3 py-1 text-xs text-white/80"
+                        >
+                          Удалить
+                        </button>
+                      </div>
                     </div>
                     <p className="mt-1 text-sm text-white/60">
                       {new Date(entry.createdAt).toLocaleString("ru-RU")}
