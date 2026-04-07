@@ -25,6 +25,18 @@ type Product = {
   createdAt: string;
 };
 
+type MealItem = {
+  id: string;
+  productId: string;
+  productName: string;
+  grams: string;
+  calories: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+  xe: number;
+};
+
 type ProductForm = {
   name: string;
   caloriesPer100g: string;
@@ -46,6 +58,9 @@ export default function MealsPage() {
   const [breadUnitGrams, setBreadUnitGrams] = useState("12");
   const [isSaved, setIsSaved] = useState(false);
   const [form, setForm] = useState<ProductForm>(defaultForm);
+  const [mealItems, setMealItems] = useState<MealItem[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState("");
+  const [mealGrams, setMealGrams] = useState("");
 
   useEffect(() => {
     const savedProducts = localStorage.getItem("products");
@@ -104,6 +119,60 @@ export default function MealsPage() {
     setProducts(updatedProducts);
     localStorage.setItem("products", JSON.stringify(updatedProducts));
   };
+
+  const handleAddMealItem = () => {
+    const product = products.find((item) => item.id === selectedProductId);
+    const grams = parseFloat(mealGrams);
+    const breadUnit = parseFloat(breadUnitGrams);
+
+    if (!product || Number.isNaN(grams) || grams <= 0) {
+      return;
+    }
+
+    const caloriesPer100g = parseFloat(product.caloriesPer100g);
+    const proteinPer100g = parseFloat(product.proteinPer100g);
+    const fatPer100g = parseFloat(product.fatPer100g);
+    const carbsPer100g = parseFloat(product.carbsPer100g);
+
+    const calories = Number.isNaN(caloriesPer100g)
+      ? 0
+      : (caloriesPer100g * grams) / 100;
+    const protein = Number.isNaN(proteinPer100g) ? 0 : (proteinPer100g * grams) / 100;
+    const fat = Number.isNaN(fatPer100g) ? 0 : (fatPer100g * grams) / 100;
+    const carbs = Number.isNaN(carbsPer100g) ? 0 : (carbsPer100g * grams) / 100;
+    const xe =
+      Number.isNaN(breadUnit) || breadUnit <= 0 ? 0 : carbs / breadUnit;
+
+    const newMealItem: MealItem = {
+      id: Date.now().toString(),
+      productId: product.id,
+      productName: product.name,
+      grams: mealGrams,
+      calories,
+      protein,
+      fat,
+      carbs,
+      xe,
+    };
+
+    setMealItems((prev) => [newMealItem, ...prev]);
+    setMealGrams("");
+  };
+
+  const handleDeleteMealItem = (id: string) => {
+    setMealItems((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const totals = mealItems.reduce(
+    (acc, item) => ({
+      calories: acc.calories + item.calories,
+      protein: acc.protein + item.protein,
+      fat: acc.fat + item.fat,
+      carbs: acc.carbs + item.carbs,
+      xe: acc.xe + item.xe,
+    }),
+    { calories: 0, protein: 0, fat: 0, carbs: 0, xe: 0 }
+  );
 
   const getXePer100g = (carbsPer100g: string) => {
     const carbs = parseFloat(carbsPer100g);
@@ -225,6 +294,92 @@ export default function MealsPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-3xl border border-white/10 bg-white/5 p-4">
+          <h2 className="text-base font-medium text-white">Текущий прием пищи</h2>
+          {products.length === 0 ? (
+            <p className="mt-3 text-sm text-white/70">
+              Сначала создайте продукты, чтобы собрать прием пищи
+            </p>
+          ) : (
+            <div className="mt-3 space-y-3">
+              <label className="block text-sm text-white/70">
+                Продукт
+                <select
+                  value={selectedProductId}
+                  onChange={(event) => setSelectedProductId(event.target.value)}
+                  className={inputClassName}
+                >
+                  <option value="">Выберите продукт</option>
+                  {products.map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.name || "Без названия"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm text-white/70">
+                Вес, г
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.1"
+                  value={mealGrams}
+                  onChange={(event) => setMealGrams(event.target.value)}
+                  className={inputClassName}
+                />
+              </label>
+              <button
+                onClick={handleAddMealItem}
+                className="w-full rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black"
+              >
+                Добавить в прием пищи
+              </button>
+            </div>
+          )}
+
+          {mealItems.length === 0 ? (
+            <p className="mt-4 text-sm text-white/70">Прием пищи пока пуст</p>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {mealItems.map((item) => (
+                <div
+                  key={item.id}
+                  className="rounded-3xl border border-white/10 bg-white/5 p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-lg font-semibold">{item.productName}</p>
+                    <button
+                      onClick={() => handleDeleteMealItem(item.id)}
+                      className="rounded-xl border border-white/20 px-3 py-1 text-xs text-white/80"
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                  <div className="mt-3 space-y-1 text-sm text-white/70">
+                    <p>Вес: {item.grams} г</p>
+                    <p>Калории: {item.calories.toFixed(2)}</p>
+                    <p>Белки: {item.protein.toFixed(2)}</p>
+                    <p>Жиры: {item.fat.toFixed(2)}</p>
+                    <p>Углеводы: {item.carbs.toFixed(2)}</p>
+                    <p className="text-white">ХЕ: {item.xe.toFixed(2)}</p>
+                  </div>
+                </div>
+              ))}
+
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                <h3 className="text-base font-medium text-white">Итого</h3>
+                <div className="mt-3 space-y-1 text-sm text-white/70">
+                  <p>Калории: {totals.calories.toFixed(2)}</p>
+                  <p>Белки: {totals.protein.toFixed(2)}</p>
+                  <p>Жиры: {totals.fat.toFixed(2)}</p>
+                  <p>Углеводы: {totals.carbs.toFixed(2)}</p>
+                  <p className="text-white">ХЕ: {totals.xe.toFixed(2)}</p>
+                </div>
+              </div>
             </div>
           )}
         </section>
