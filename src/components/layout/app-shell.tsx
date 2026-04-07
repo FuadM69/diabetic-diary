@@ -30,9 +30,7 @@ export function AppShell({ title, children }: AppShellProps) {
 
       const fullName = user?.user_metadata?.full_name;
       setHeaderSubtitle(
-        fullName != null && String(fullName).trim() !== ""
-          ? `Дневник ${fullName}`
-          : "Дневник диабетика"
+        fullName ? `Дневник ${fullName}` : "Дневник диабетика"
       );
     };
     loadUser();
