@@ -2,11 +2,24 @@
 
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
 type GlucoseEntry = {
   id: string;
   value: string;
   createdAt: string;
+};
+
+type GlucoseChartPoint = {
+  value: number;
+  time: string;
 };
 
 export default function GlucosePage() {
@@ -48,6 +61,18 @@ export default function GlucosePage() {
     }, 2000);
   };
 
+  const chartData: GlucoseChartPoint[] = entries
+    .slice(0, 10)
+    .reverse()
+    .map((entry) => ({
+      value: parseFloat(entry.value),
+      time: new Date(entry.createdAt).toLocaleTimeString("ru-RU", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    }))
+    .filter((entry) => !Number.isNaN(entry.value));
+
   return (
     <AppShell title="Глюкоза">
       <div className="flex min-h-full items-center justify-center">
@@ -81,6 +106,24 @@ export default function GlucosePage() {
               </button>
               {isSaved && <p className="text-sm text-white/70">Сохранено</p>}
             </div>
+          </section>
+
+          <section className="w-full rounded-3xl border border-white/10 bg-white/5 p-4">
+            <h2 className="text-base font-medium text-white">График глюкозы</h2>
+            {chartData.length === 0 ? (
+              <p className="mt-3 text-sm text-white/70">Нет данных для графика</p>
+            ) : (
+              <div className="mt-3 h-[200px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartData}>
+                    <XAxis dataKey="time" />
+                    <YAxis dataKey="value" />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="value" stroke="#ffffff" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </section>
 
           <section className="w-full rounded-3xl border border-white/10 bg-white/5 p-4">
