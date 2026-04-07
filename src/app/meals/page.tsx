@@ -37,6 +37,17 @@ type MealItem = {
   xe: number;
 };
 
+type SavedMeal = {
+  id: string;
+  createdAt: string;
+  items: MealItem[];
+  totalCalories: number;
+  totalProtein: number;
+  totalFat: number;
+  totalCarbs: number;
+  totalXe: number;
+};
+
 type ProductForm = {
   name: string;
   caloriesPer100g: string;
@@ -61,6 +72,8 @@ export default function MealsPage() {
   const [mealItems, setMealItems] = useState<MealItem[]>([]);
   const [selectedProductId, setSelectedProductId] = useState("");
   const [mealGrams, setMealGrams] = useState("");
+  const [savedMeals, setSavedMeals] = useState<SavedMeal[]>([]);
+  const [isMealSaved, setIsMealSaved] = useState(false);
 
   useEffect(() => {
     const savedProducts = localStorage.getItem("products");
@@ -82,6 +95,20 @@ export default function MealsPage() {
         setBreadUnitGrams(parsedSettings.breadUnitGrams || "12");
       } catch {
         setBreadUnitGrams("12");
+      }
+    }
+
+    const savedMealHistory = localStorage.getItem("meal_history");
+    if (savedMealHistory) {
+      try {
+        const parsedMealHistory: SavedMeal[] = JSON.parse(savedMealHistory);
+        if (Array.isArray(parsedMealHistory)) {
+          setSavedMeals(parsedMealHistory);
+        } else {
+          setSavedMeals([]);
+        }
+      } catch {
+        setSavedMeals([]);
       }
     }
   }, []);
@@ -161,6 +188,38 @@ export default function MealsPage() {
 
   const handleDeleteMealItem = (id: string) => {
     setMealItems((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleSaveMeal = () => {
+    if (mealItems.length === 0) {
+      return;
+    }
+
+    const newSavedMeal: SavedMeal = {
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString(),
+      items: mealItems,
+      totalCalories: totals.calories,
+      totalProtein: totals.protein,
+      totalFat: totals.fat,
+      totalCarbs: totals.carbs,
+      totalXe: totals.xe,
+    };
+
+    const updatedHistory = [newSavedMeal, ...savedMeals];
+    setSavedMeals(updatedHistory);
+    localStorage.setItem("meal_history", JSON.stringify(updatedHistory));
+    setMealItems([]);
+    setIsMealSaved(true);
+    setTimeout(() => {
+      setIsMealSaved(false);
+    }, 2000);
+  };
+
+  const handleDeleteSavedMeal = (mealId: string) => {
+    const updatedHistory = savedMeals.filter((meal) => meal.id !== mealId);
+    setSavedMeals(updatedHistory);
+    localStorage.setItem("meal_history", JSON.stringify(updatedHistory));
   };
 
   const totals = mealItems.reduce(
@@ -380,6 +439,65 @@ export default function MealsPage() {
                   <p className="text-white">ХЕ: {totals.xe.toFixed(2)}</p>
                 </div>
               </div>
+              <button
+                onClick={handleSaveMeal}
+                className="w-full rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black"
+              >
+                Сохранить прием пищи
+              </button>
+              {isMealSaved && (
+                <p className="text-sm text-white/70">Прием пищи сохранен</p>
+              )}
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-3xl border border-white/10 bg-white/5 p-4">
+          <h2 className="text-base font-medium text-white">История приемов пищи</h2>
+          {savedMeals.length === 0 ? (
+            <p className="mt-3 text-sm text-white/70">
+              История приемов пищи пока пуста
+            </p>
+          ) : (
+            <div className="mt-3 space-y-3">
+              {savedMeals.map((meal) => (
+                <div
+                  key={meal.id}
+                  className="rounded-3xl border border-white/10 bg-white/5 p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-sm text-white/60">
+                      {new Date(meal.createdAt).toLocaleString("ru-RU")}
+                    </p>
+                    <button
+                      onClick={() => handleDeleteSavedMeal(meal.id)}
+                      className="rounded-xl border border-white/20 px-3 py-1 text-xs text-white/80"
+                    >
+                      Удалить
+                    </button>
+                  </div>
+
+                  <div className="mt-3 space-y-1 text-sm text-white/70">
+                    {meal.items.map((item) => (
+                      <p key={item.id}>
+                        {item.productName} - {item.grams} г - ХЕ:{" "}
+                        {item.xe.toFixed(2)}
+                      </p>
+                    ))}
+                  </div>
+
+                  <div className="mt-3 rounded-2xl border border-white/10 bg-black/30 p-3">
+                    <p className="text-sm font-medium text-white">Итого</p>
+                    <div className="mt-2 space-y-1 text-sm text-white/70">
+                      <p>Калории: {meal.totalCalories.toFixed(2)}</p>
+                      <p>Белки: {meal.totalProtein.toFixed(2)}</p>
+                      <p>Жиры: {meal.totalFat.toFixed(2)}</p>
+                      <p>Углеводы: {meal.totalCarbs.toFixed(2)}</p>
+                      <p className="text-white">ХЕ: {meal.totalXe.toFixed(2)}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </section>
