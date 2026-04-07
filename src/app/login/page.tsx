@@ -1,13 +1,25 @@
-"use client";
-
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { createClient } from "@/utils/supabase/client";
+import { createServerClient } from "@/utils/supabase/server";
+import { redirect } from "next/navigation";
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  const supabase = createServerClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (user) {
+    redirect("/");
+  }
+
+  // keep existing UI below
+
   const router = useRouter();
-  const supabase = createClient();
+  const supabaseClient = createClient();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,7 +32,7 @@ export default function LoginPage() {
     setErrorMessage("");
     setSuccessMessage("");
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabaseClient.auth.signInWithPassword({
       email,
       password,
     });
@@ -42,7 +54,7 @@ export default function LoginPage() {
     setErrorMessage("");
     setSuccessMessage("");
 
-    const { error } = await supabase.auth.signUp({
+    const { error } = await supabaseClient.auth.signUp({
       email,
       password,
     });
