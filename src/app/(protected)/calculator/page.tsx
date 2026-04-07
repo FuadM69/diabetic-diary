@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 
 type DiabetesSettings = {
@@ -26,27 +26,48 @@ type CalculationResult = {
   total: number;
 };
 
+const STORAGE_KEY = "diabetes_settings";
+
+function subscribeToStorage(callback: () => void) {
+  window.addEventListener("storage", callback);
+  return () => window.removeEventListener("storage", callback);
+}
+
+function readSettingsRaw(): string | null {
+  try {
+    return localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function parseSettings(raw: string | null): DiabetesSettings | null {
+  if (!raw) {
+    return null;
+  }
+  try {
+    return JSON.parse(raw) as DiabetesSettings;
+  } catch {
+    return null;
+  }
+}
+
 export default function CalculatorPage() {
-  const [settings, setSettings] = useState<DiabetesSettings | null>(null);
+  const settingsRaw = useSyncExternalStore(
+    subscribeToStorage,
+    readSettingsRaw,
+    () => null
+  );
+
+  const settings = useMemo(
+    () => parseSettings(settingsRaw),
+    [settingsRaw]
+  );
+
   const [currentGlucose, setCurrentGlucose] = useState("");
   const [carbs, setCarbs] = useState("");
   const [profile, setProfile] = useState<Profile>("breakfast");
   const [result, setResult] = useState<CalculationResult | null>(null);
-
-  useEffect(() => {
-    const savedSettings = localStorage.getItem("diabetes_settings");
-    if (!savedSettings) {
-      setSettings(null);
-      return;
-    }
-
-    try {
-      const parsedSettings: DiabetesSettings = JSON.parse(savedSettings);
-      setSettings(parsedSettings);
-    } catch {
-      setSettings(null);
-    }
-  }, []);
 
   const getRatioByProfile = (currentProfile: Profile) => {
     if (!settings) {
@@ -93,7 +114,8 @@ export default function CalculatorPage() {
     const xe = carbsValue / breadUnitGrams;
     const mealDose = xe * ratio;
     const target = (targetMin + targetMax) / 2;
-    const correction = (currentGlucoseValue - target) / insulinSensitivityFactor;
+    const correction =
+      (currentGlucoseValue - target) / insulinSensitivityFactor;
     const total = Math.max(0, mealDose + correction);
 
     setResult({
@@ -148,7 +170,9 @@ export default function CalculatorPage() {
                   Профиль
                   <select
                     value={profile}
-                    onChange={(event) => setProfile(event.target.value as Profile)}
+                    onChange={(event) =>
+                      setProfile(event.target.value as Profile)
+                    }
                     className={inputClassName}
                   >
                     <option value="breakfast">breakfast</option>
@@ -159,6 +183,7 @@ export default function CalculatorPage() {
                 </label>
 
                 <button
+                  type="button"
                   onClick={handleCalculate}
                   className="w-full rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black"
                 >
@@ -167,7 +192,7 @@ export default function CalculatorPage() {
               </div>
             </section>
 
-            {result && (
+            {result ? (
               <section className="rounded-3xl border border-white/10 bg-white/5 p-4">
                 <h2 className="text-base font-medium text-white">Результат</h2>
                 <div className="mt-3 space-y-1 text-sm text-white/80">
@@ -185,19 +210,21 @@ export default function CalculatorPage() {
                     {result.xe.toFixed(2)}
                   </p>
                   <p>
-                    Доза на еду = {result.xe.toFixed(2)} * {result.ratio.toFixed(2)} ={" "}
-                    {result.mealDose.toFixed(2)}
+                    Доза на еду = {result.xe.toFixed(2)} *{" "}
+                    {result.ratio.toFixed(2)} = {result.mealDose.toFixed(2)}
                   </p>
                   <p>
-                    Коррекция = ({parseFloat(currentGlucose || "0").toFixed(2)} -{" "}
-                    {result.target.toFixed(2)}) /{" "}
-                    {parseFloat(settings.insulinSensitivityFactor || "0").toFixed(2)} ={" "}
-                    {result.correction.toFixed(2)}
+                    Коррекция = ({parseFloat(currentGlucose || "0").toFixed(2)}{" "}
+                    - {result.target.toFixed(2)}) /{" "}
+                    {parseFloat(settings.insulinSensitivityFactor || "0").toFixed(
+                      2
+                    )}{" "}
+                    = {result.correction.toFixed(2)}
                   </p>
                   <p>Итого = {result.total.toFixed(2)}</p>
                 </div>
               </section>
-            )}
+            ) : null}
 
             <section className="rounded-3xl border border-white/10 bg-white/5 p-4">
               <p className="text-sm leading-6 text-white/80">

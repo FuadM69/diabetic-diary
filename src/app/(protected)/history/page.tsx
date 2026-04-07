@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 
 type GlucoseEntry = {
@@ -61,72 +61,98 @@ type TimelineItem =
       data: InsulinEntry;
     };
 
+function subscribeStorage(onChange: () => void) {
+  window.addEventListener("storage", onChange);
+  return () => window.removeEventListener("storage", onChange);
+}
+
+function historyStorageFingerprint(): string {
+  try {
+    return [
+      localStorage.getItem("glucose_entries") ?? "",
+      localStorage.getItem("meal_history") ?? "",
+      localStorage.getItem("insulin_entries") ?? "",
+    ].join("\u001f");
+  } catch {
+    return "";
+  }
+}
+
+function buildTimelineFromStorage(): TimelineItem[] {
+  let glucoseEntries: GlucoseEntry[] = [];
+  let mealHistory: SavedMeal[] = [];
+  let insulinEntries: InsulinEntry[] = [];
+
+  const savedGlucoseEntries = localStorage.getItem("glucose_entries");
+  if (savedGlucoseEntries) {
+    try {
+      const parsed: GlucoseEntry[] = JSON.parse(savedGlucoseEntries);
+      glucoseEntries = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      glucoseEntries = [];
+    }
+  }
+
+  const savedMealHistory = localStorage.getItem("meal_history");
+  if (savedMealHistory) {
+    try {
+      const parsed: SavedMeal[] = JSON.parse(savedMealHistory);
+      mealHistory = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      mealHistory = [];
+    }
+  }
+
+  const savedInsulinEntries = localStorage.getItem("insulin_entries");
+  if (savedInsulinEntries) {
+    try {
+      const parsed: InsulinEntry[] = JSON.parse(savedInsulinEntries);
+      insulinEntries = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      insulinEntries = [];
+    }
+  }
+
+  const timelineItems: TimelineItem[] = [
+    ...glucoseEntries.map((entry) => ({
+      id: `glucose-${entry.id}`,
+      type: "glucose" as const,
+      createdAt: entry.createdAt,
+      data: entry,
+    })),
+    ...mealHistory.map((meal) => ({
+      id: `meal-${meal.id}`,
+      type: "meal" as const,
+      createdAt: meal.createdAt,
+      data: meal,
+    })),
+    ...insulinEntries.map((entry) => ({
+      id: `insulin-${entry.id}`,
+      type: "insulin" as const,
+      createdAt: entry.createdAt,
+      data: entry,
+    })),
+  ];
+
+  timelineItems.sort(
+    (a, b) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+
+  return timelineItems;
+}
+
 export default function HistoryPage() {
-  const [timeline, setTimeline] = useState<TimelineItem[]>([]);
+  const storageKey = useSyncExternalStore(
+    subscribeStorage,
+    historyStorageFingerprint,
+    () => ""
+  );
 
-  useEffect(() => {
-    let glucoseEntries: GlucoseEntry[] = [];
-    let mealHistory: SavedMeal[] = [];
-    let insulinEntries: InsulinEntry[] = [];
-
-    const savedGlucoseEntries = localStorage.getItem("glucose_entries");
-    if (savedGlucoseEntries) {
-      try {
-        const parsed: GlucoseEntry[] = JSON.parse(savedGlucoseEntries);
-        glucoseEntries = Array.isArray(parsed) ? parsed : [];
-      } catch {
-        glucoseEntries = [];
-      }
-    }
-
-    const savedMealHistory = localStorage.getItem("meal_history");
-    if (savedMealHistory) {
-      try {
-        const parsed: SavedMeal[] = JSON.parse(savedMealHistory);
-        mealHistory = Array.isArray(parsed) ? parsed : [];
-      } catch {
-        mealHistory = [];
-      }
-    }
-
-    const savedInsulinEntries = localStorage.getItem("insulin_entries");
-    if (savedInsulinEntries) {
-      try {
-        const parsed: InsulinEntry[] = JSON.parse(savedInsulinEntries);
-        insulinEntries = Array.isArray(parsed) ? parsed : [];
-      } catch {
-        insulinEntries = [];
-      }
-    }
-
-    const timelineItems: TimelineItem[] = [
-      ...glucoseEntries.map((entry) => ({
-        id: `glucose-${entry.id}`,
-        type: "glucose" as const,
-        createdAt: entry.createdAt,
-        data: entry,
-      })),
-      ...mealHistory.map((meal) => ({
-        id: `meal-${meal.id}`,
-        type: "meal" as const,
-        createdAt: meal.createdAt,
-        data: meal,
-      })),
-      ...insulinEntries.map((entry) => ({
-        id: `insulin-${entry.id}`,
-        type: "insulin" as const,
-        createdAt: entry.createdAt,
-        data: entry,
-      })),
-    ];
-
-    timelineItems.sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-
-    setTimeline(timelineItems);
-  }, []);
+  const timeline = useMemo(() => {
+    void storageKey;
+    return buildTimelineFromStorage();
+  }, [storageKey]);
 
   return (
     <AppShell title="История">

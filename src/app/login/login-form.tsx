@@ -62,7 +62,7 @@ export default function LoginForm() {
   };
 
   return (
-    <AppShell title="Вход">
+    <AppShell title="Вход" showMobileNav={false}>
       <div className="flex min-h-[70vh] items-center justify-center">
         <div className="w-full rounded-3xl border border-white/10 bg-white/5 p-4">
           <div className="space-y-4">

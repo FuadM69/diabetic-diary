@@ -1,0 +1,51 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { createMealEntry } from "@/lib/db/meals";
+import { createClient } from "@/lib/supabase/server";
+import { parseMealCreationForm } from "@/lib/utils/meal-form";
+
+export type MealActionResult = {
+  success: boolean;
+  error: string | null;
+};
+
+export async function createMealEntryAction(
+  formData: FormData
+): Promise<MealActionResult> {
+  const parsed = parseMealCreationForm(formData);
+  if (!parsed.ok) {
+    return { success: false, error: parsed.message };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError) {
+    console.error("[meals] auth.getUser:", authError);
+    return {
+      success: false,
+      error: "Не удалось проверить вход. Попробуйте войти снова.",
+    };
+  }
+
+  if (!user) {
+    return { success: false, error: "Нужно войти в аккаунт." };
+  }
+
+  const result = await createMealEntry(user.id, parsed.data);
+
+  if (!result.ok) {
+    console.error("[meals] create failed:", result.errorMessage);
+    return {
+      success: false,
+      error: result.errorMessage || "Не удалось сохранить приём пищи.",
+    };
+  }
+
+  revalidatePath("/meals");
+  return { success: true, error: null };
+}

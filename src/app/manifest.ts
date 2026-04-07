@@ -2,11 +2,14 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    id: "/",
     name: "Дневник диабетика",
     short_name: "Диабет дневник",
     description: "Личный PWA-дневник для учета глюкозы, еды и инсулина.",
     start_url: "/",
+    scope: "/",
     display: "standalone",
+    display_override: ["standalone", "browser"],
     background_color: "#000000",
     theme_color: "#000000",
     orientation: "portrait",
