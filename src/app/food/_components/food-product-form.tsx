@@ -87,7 +87,7 @@ export function FoodProductForm({ formKey }: FoodProductFormProps) {
             name="calories_per_100g"
             type="number"
             inputMode="decimal"
-            step="1"
+            step="0.1"
             min={0}
             required
             disabled={isPending}
