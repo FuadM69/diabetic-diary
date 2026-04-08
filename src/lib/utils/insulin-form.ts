@@ -8,6 +8,23 @@ import {
 /** Upper bound for units (typical pump/pen diary). */
 export const INSULIN_UNITS_MAX = 300;
 
+/** Set `INSULIN_DEBUG=1` for temporary insulin create/update tracing (server). */
+export function isInsulinDebugLogEnabled(): boolean {
+  return process.env.INSULIN_DEBUG === "1";
+}
+
+/**
+ * Snap bolus estimate to 0.05 U steps (2 decimal places) so prefilled values work with
+ * `type="number"` step constraints and match typical pen increments.
+ */
+export function roundInsulinPrefillUnits(totalBolus: number): number {
+  if (!Number.isFinite(totalBolus) || totalBolus <= 0) {
+    return totalBolus;
+  }
+  const stepped = Math.round(totalBolus * 20) / 20;
+  return Math.round(stepped * 100) / 100;
+}
+
 const ENTRY_TYPE_SET = new Set<string>(INSULIN_ENTRY_TYPES);
 
 export type InsulinFormParsed = {
@@ -177,7 +194,7 @@ export function parseInsulinQueryPrefill(
   }
 
   return {
-    units: String(unitsParsed.value),
+    units: String(roundInsulinPrefillUnits(unitsParsed.value)),
     entry_type,
     note,
   };

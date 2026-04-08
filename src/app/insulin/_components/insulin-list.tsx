@@ -7,9 +7,10 @@ import { InsulinCard } from "./insulin-card";
 type InsulinListProps = {
   entries: InsulinEntry[];
   range: GlucoseRangeKey;
+  userTimezone: string | null;
 };
 
-export function InsulinList({ entries, range }: InsulinListProps) {
+export function InsulinList({ entries, range, userTimezone }: InsulinListProps) {
   if (entries.length === 0) {
     const empty = getInsulinListEmptyMessage(range);
     const action =
@@ -28,7 +29,11 @@ export function InsulinList({ entries, range }: InsulinListProps) {
   return (
     <ul className="space-y-3">
       {entries.map((entry) => (
-        <InsulinCard key={entry.id} entry={entry} />
+        <InsulinCard
+          key={entry.id}
+          entry={entry}
+          userTimezone={userTimezone}
+        />
       ))}
     </ul>
   );

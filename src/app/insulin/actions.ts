@@ -9,7 +9,9 @@ import {
 import { getUserSettings } from "@/lib/db/settings";
 import { createClient } from "@/lib/supabase/server";
 import { parseGlucoseEntryId } from "@/lib/utils/glucose";
+import { explainLogRangeTimeZone } from "@/lib/utils/log-range-bounds";
 import {
+  isInsulinDebugLogEnabled,
   parseInsulinCreateForm,
   parseInsulinUpdateForm,
 } from "@/lib/utils/insulin-form";
@@ -41,12 +43,47 @@ export async function createInsulinEntryAction(
   }
 
   const settings = await getUserSettings(user.id);
+
+  if (isInsulinDebugLogEnabled()) {
+    const snapshot = Object.fromEntries(formData.entries());
+    console.log("[insulin][create] FormData:", JSON.stringify(snapshot));
+    console.log(
+      "[insulin][create] settings.timezone raw:",
+      JSON.stringify(settings.timezone)
+    );
+    console.log(
+      "[insulin][create] timezone resolved:",
+      JSON.stringify(explainLogRangeTimeZone(settings.timezone))
+    );
+  }
+
   const parsed = parseInsulinCreateForm(formData, settings.timezone);
   if (!parsed.ok) {
+    if (isInsulinDebugLogEnabled()) {
+      console.log("[insulin][create] parse failed:", parsed.message);
+    }
     return { success: false, error: parsed.message };
   }
 
+  if (isInsulinDebugLogEnabled()) {
+    console.log(
+      "[insulin][create] parsed payload:",
+      JSON.stringify(parsed.data)
+    );
+    console.log(
+      "[insulin][create] final taken_at UTC ISO:",
+      parsed.data.taken_at
+    );
+  }
+
   const result = await createInsulinEntry(user.id, parsed.data);
+
+  if (isInsulinDebugLogEnabled()) {
+    console.log(
+      "[insulin][create] DB result:",
+      result.ok ? `ok id=${result.row?.id}` : result.errorMessage
+    );
+  }
 
   if (!result.ok) {
     console.error("[insulin] create failed:", result.errorMessage);

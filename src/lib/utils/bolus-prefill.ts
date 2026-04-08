@@ -3,7 +3,10 @@
  */
 import { formatBolusDose } from "@/lib/utils/bolus";
 import { GLUCOSE_INPUT_MAX } from "@/lib/utils/glucose";
-import { INSULIN_NOTE_PREFILL_MAX } from "@/lib/utils/insulin-form";
+import {
+  INSULIN_NOTE_PREFILL_MAX,
+  roundInsulinPrefillUnits,
+} from "@/lib/utils/insulin-form";
 
 /** Reasonable upper bound for "carbs this meal" in the helper (g). */
 const BOLUS_PREFILL_CARBS_MAX = 2000;
@@ -118,7 +121,7 @@ export function buildInsulinPrefillHref(params: {
 }): string {
   const note = buildInsulinNoteFromBolusContext(params);
   const q = new URLSearchParams();
-  q.set("units", String(params.totalBolus));
+  q.set("units", String(roundInsulinPrefillUnits(params.totalBolus)));
   q.set("entry_type", "bolus");
   if (note.length > 0) {
     q.set("note", note);

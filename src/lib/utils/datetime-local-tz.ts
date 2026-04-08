@@ -9,6 +9,82 @@ import {
   readZonedWallClockParts,
 } from "@/lib/utils/log-range-bounds";
 
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+/**
+ * Format a UTC instant as `YYYY-MM-DDTHH:mm` wall time in `ianaTimeZone`
+ * (matches what {@link datetimeLocalInUserTimezoneToUtcIso} expects on submit).
+ */
+export function utcInstantToDatetimeLocalInTimezone(
+  utcDate: Date,
+  ianaTimeZone: string
+): string | null {
+  if (!isLikelyValidIanaTimeZone(ianaTimeZone)) {
+    return null;
+  }
+  const p = readZonedWallClockParts(utcDate, ianaTimeZone);
+  return `${p.year}-${pad2(p.month)}-${pad2(p.day)}T${pad2(p.hour)}:${pad2(p.minute)}`;
+}
+
+export type DatetimeLocalForUserSettingsResult =
+  | { ok: true; value: string }
+  | { ok: false; message: string };
+
+/**
+ * Current time as `datetime-local` string in the user’s saved timezone (for form defaults).
+ */
+export function defaultDatetimeLocalForUserSettings(
+  savedTimezone: string | null | undefined,
+  now: Date = new Date()
+): DatetimeLocalForUserSettingsResult {
+  const tzRes = resolveTimezoneForFormDatetime(savedTimezone);
+  if (!tzRes.ok) {
+    const fallback =
+      tzRes.reason === "missing"
+        ? "Укажите часовой пояс в настройках профиля — без него время в форме нельзя согласовать с сервером."
+        : "Часовой пояс в настройках не распознан. Используйте IANA (например, Europe/Moscow) или формат UTC+3.";
+    return { ok: false, message: fallback };
+  }
+  const local = utcInstantToDatetimeLocalInTimezone(now, tzRes.iana);
+  if (local == null) {
+    return {
+      ok: false,
+      message:
+        "Не удалось вычислить местное время для вашего часового пояса. Проверьте настройки.",
+    };
+  }
+  return { ok: true, value: local };
+}
+
+/** Stored UTC ISO → `datetime-local` digits in the user’s saved timezone (editing). */
+export function utcIsoToDatetimeLocalInUserTimezone(
+  iso: string,
+  savedTimezone: string | null | undefined
+): DatetimeLocalForUserSettingsResult {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    return { ok: false, message: "Некорректная дата записи." };
+  }
+  const tzRes = resolveTimezoneForFormDatetime(savedTimezone);
+  if (!tzRes.ok) {
+    const fallback =
+      tzRes.reason === "missing"
+        ? "Укажите часовой пояс в настройках профиля."
+        : "Часовой пояс в настройках не распознан.";
+    return { ok: false, message: fallback };
+  }
+  const local = utcInstantToDatetimeLocalInTimezone(d, tzRes.iana);
+  if (local == null) {
+    return {
+      ok: false,
+      message: "Не удалось отобразить время для вашего часового пояса.",
+    };
+  }
+  return { ok: true, value: local };
+}
+
 type WallParts = ReturnType<typeof readZonedWallClockParts>;
 
 function compareWallParts(a: WallParts, b: WallParts): number {

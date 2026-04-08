@@ -3,9 +3,10 @@
  */
 import { createClient } from "@/lib/supabase/server";
 import type { InsulinEntry } from "@/lib/types/insulin";
-import type {
-  InsulinFormParsed,
-  InsulinUpdateFormParsed,
+import {
+  isInsulinDebugLogEnabled,
+  type InsulinFormParsed,
+  type InsulinUpdateFormParsed,
 } from "@/lib/utils/insulin-form";
 
 export type GetInsulinEntriesOptions = {
@@ -63,6 +64,15 @@ export async function createInsulinEntry(
     })
     .select(INSULIN_SELECT)
     .maybeSingle();
+
+  if (isInsulinDebugLogEnabled()) {
+    console.log(
+      "[insulin][db] insert:",
+      error
+        ? { ok: false, message: error.message }
+        : { ok: true, taken_at: (data as InsulinEntry | null)?.taken_at }
+    );
+  }
 
   if (error) {
     return { ok: false, errorMessage: error.message };

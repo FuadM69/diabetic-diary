@@ -27,9 +27,10 @@ const TYPE_PRESENTATION: Record<
 
 type InsulinCardProps = {
   entry: InsulinEntry;
+  userTimezone: string | null;
 };
 
-export function InsulinCard({ entry }: InsulinCardProps) {
+export function InsulinCard({ entry, userTimezone }: InsulinCardProps) {
   const ui = TYPE_PRESENTATION[entry.entry_type];
 
   return (
@@ -65,7 +66,7 @@ export function InsulinCard({ entry }: InsulinCardProps) {
       ) : null}
 
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-white/10 pt-3">
-        <EditInsulinDialog entry={entry} />
+        <EditInsulinDialog entry={entry} userTimezone={userTimezone} />
         <DeleteInsulinButton entryId={entry.id} />
       </div>
     </li>

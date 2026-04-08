@@ -9,7 +9,7 @@ import {
 } from "react";
 import { useFormStatus } from "react-dom";
 import { INSULIN_ENTRY_TYPES, type InsulinEntry } from "@/lib/types/insulin";
-import { formatDatetimeLocalFromIso } from "@/lib/utils/datetime-local";
+import { utcIsoToDatetimeLocalInUserTimezone } from "@/lib/utils/datetime-local-tz";
 import { INSULIN_ENTRY_TYPE_LABEL_RU } from "@/lib/utils/insulin";
 import {
   updateInsulinEntryAction,
@@ -25,12 +25,12 @@ const initialState: InsulinActionResult = {
 const inputClass =
   "mt-2 w-full rounded-2xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none focus:border-white/35 disabled:opacity-60";
 
-function SaveButton() {
+function SaveButton({ disabled }: { disabled: boolean }) {
   const { pending } = useFormStatus();
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={pending || disabled}
       className="rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-black disabled:opacity-60"
     >
       {pending ? "Сохранение…" : "Сохранить"}
@@ -40,14 +40,22 @@ function SaveButton() {
 
 function EditFormBody({
   entry,
+  userTimezone,
   onSuccess,
   onCancel,
 }: {
   entry: InsulinEntry;
+  userTimezone: string | null;
   onSuccess: () => void;
   onCancel: () => void;
 }) {
-  const takenAtDefault = formatDatetimeLocalFromIso(entry.taken_at);
+  const takenAtParsed = utcIsoToDatetimeLocalInUserTimezone(
+    entry.taken_at,
+    userTimezone
+  );
+  const takenAtDefault = takenAtParsed.ok ? takenAtParsed.value : "";
+  const timezoneFieldError = takenAtParsed.ok ? null : takenAtParsed.message;
+  const blockEdit = !takenAtParsed.ok;
 
   const [state, formAction, isPending] = useActionState(
     async (_prev: InsulinActionResult, formData: FormData) =>
@@ -65,6 +73,12 @@ function EditFormBody({
     <form action={formAction} className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
       <input type="hidden" name="entryId" value={entry.id} />
 
+      {timezoneFieldError ? (
+        <p role="alert" className={FEEDBACK_ERROR}>
+          {timezoneFieldError}
+        </p>
+      ) : null}
+
       <div>
         <label htmlFor={`insulin-taken-${entry.id}`} className="text-sm text-white/70">
           Когда введено
@@ -75,7 +89,7 @@ function EditFormBody({
           type="datetime-local"
           required
           defaultValue={takenAtDefault}
-          disabled={isPending}
+          disabled={isPending || blockEdit}
           className={inputClass}
         />
       </div>
@@ -91,7 +105,7 @@ function EditFormBody({
                 value={key}
                 defaultChecked={entry.entry_type === key}
                 required={key === INSULIN_ENTRY_TYPES[0]}
-                disabled={isPending}
+                disabled={isPending || blockEdit}
                 className="peer sr-only"
               />
               <span className="block rounded-2xl border border-white/15 bg-white/[0.04] px-3 py-3 text-center text-sm text-white/90 peer-checked:border-white peer-checked:bg-white peer-checked:font-medium peer-checked:text-black">
@@ -112,10 +126,10 @@ function EditFormBody({
           type="number"
           inputMode="decimal"
           min={0.05}
-          step="0.05"
+          step="any"
           required
           defaultValue={entry.units}
-          disabled={isPending}
+          disabled={isPending || blockEdit}
           className={inputClass}
         />
       </div>
@@ -130,7 +144,7 @@ function EditFormBody({
           name="insulin_name"
           type="text"
           defaultValue={entry.insulin_name ?? ""}
-          disabled={isPending}
+          disabled={isPending || blockEdit}
           className={inputClass}
         />
       </div>
@@ -145,7 +159,7 @@ function EditFormBody({
           name="note"
           rows={2}
           defaultValue={entry.note ?? ""}
-          disabled={isPending}
+          disabled={isPending || blockEdit}
           className={`${inputClass} resize-none`}
         />
       </div>
@@ -165,7 +179,7 @@ function EditFormBody({
         >
           Отмена
         </button>
-        <SaveButton />
+        <SaveButton disabled={blockEdit} />
       </div>
     </form>
   );
@@ -173,9 +187,13 @@ function EditFormBody({
 
 type EditInsulinDialogProps = {
   entry: InsulinEntry;
+  userTimezone: string | null;
 };
 
-export function EditInsulinDialog({ entry }: EditInsulinDialogProps) {
+export function EditInsulinDialog({
+  entry,
+  userTimezone,
+}: EditInsulinDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [session, setSession] = useState(0);
 
@@ -215,6 +233,7 @@ export function EditInsulinDialog({ entry }: EditInsulinDialogProps) {
         <EditFormBody
           key={session}
           entry={entry}
+          userTimezone={userTimezone}
           onSuccess={close}
           onCancel={close}
         />

@@ -3,11 +3,15 @@ import { AppShell } from "@/components/layout/app-shell";
 import { getCurrentUser } from "@/lib/auth/getUser";
 import { getInsulinEntries } from "@/lib/db/insulin";
 import { getUserSettings } from "@/lib/db/settings";
+import { defaultDatetimeLocalForUserSettings } from "@/lib/utils/datetime-local-tz";
 import {
   getGlucoseRangeMeasuredAtLowerBound,
   parseGlucoseRangeParam,
 } from "@/lib/utils/glucose";
-import { parseInsulinQueryPrefill } from "@/lib/utils/insulin-form";
+import {
+  isInsulinDebugLogEnabled,
+  parseInsulinQueryPrefill,
+} from "@/lib/utils/insulin-form";
 import { InsulinForm } from "./_components/insulin-form";
 import { InsulinList } from "./_components/insulin-list";
 import { InsulinRangeFilter } from "./_components/insulin-range-filter";
@@ -43,6 +47,15 @@ export default async function InsulinPage({ searchParams }: InsulinPageProps) {
   const entries = await getInsulinEntries(user.id, { takenAtGte });
   const queryPrefill = parseInsulinQueryPrefill(params);
   const formKey = `${entries.length}-${range}-${queryPrefill ? `p-${queryPrefill.units}` : "np"}`;
+  const takenAtDefault = defaultDatetimeLocalForUserSettings(settings.timezone);
+
+  if (isInsulinDebugLogEnabled()) {
+    console.log(
+      "[insulin][page] query prefill:",
+      JSON.stringify(queryPrefill)
+    );
+    console.log("[insulin][page] default taken_at local:", takenAtDefault);
+  }
 
   return (
     <AppShell title="Инсулин">
@@ -68,12 +81,25 @@ export default async function InsulinPage({ searchParams }: InsulinPageProps) {
               сохранением.
             </p>
           ) : null}
-          <InsulinForm formKey={formKey} queryPrefill={queryPrefill} />
+          <InsulinForm
+            key={formKey}
+            queryPrefill={queryPrefill}
+            defaultTakenAtLocal={
+              takenAtDefault.ok ? takenAtDefault.value : ""
+            }
+            timezoneConfigError={
+              takenAtDefault.ok ? null : takenAtDefault.message
+            }
+          />
         </section>
 
         <section className="space-y-3">
           <h2 className={SECTION_TITLE}>Записи</h2>
-          <InsulinList entries={entries} range={range} />
+          <InsulinList
+            entries={entries}
+            range={range}
+            userTimezone={settings.timezone}
+          />
         </section>
       </div>
     </AppShell>
