@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import type { BolusRecentMealOption } from "@/lib/types/bolus";
+import type { BolusMealContext, BolusRecentMealOption } from "@/lib/types/bolus";
 import type { UserSettings } from "@/lib/types/glucose";
 import type { BolusEstimate } from "@/lib/utils/bolus";
 import { computeBolusEstimate } from "@/lib/utils/bolus";
@@ -17,16 +17,28 @@ import { formatGlucoseDate } from "@/lib/utils/glucose";
 import { BolusResultCard } from "./bolus-result-card";
 
 const inputClass =
-  "mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none placeholder:text-white/40 focus:border-white/30";
+  "mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-base text-white outline-none placeholder:text-white/40 focus:border-white/30";
 
 type BolusFormProps = {
   settings: UserSettings;
   recentMeals: BolusRecentMealOption[];
   /** Query prefill from /bolus?… (form init only). */
   urlPrefill: BolusUrlPrefill;
+  /** Resolved journal meal when `mealId` is in the URL (display + insulin note id). */
+  initialMealContext: BolusMealContext | null;
+  /** True when URL had `mealId` but the row was not found. */
+  linkedMealMissing: boolean;
   latestGlucose: number | null;
   latestGlucoseMeasuredAt: string | null;
 };
+
+function recentOptionToContext(m: BolusRecentMealOption): BolusMealContext {
+  return {
+    mealTypeLabel: m.mealTypeLabel,
+    eatenAtDisplay: formatGlucoseDate(m.eatenAt),
+    carbsGrams: m.totalCarbs,
+  };
+}
 
 function toComputeSettings(s: UserSettings) {
   return {
@@ -41,10 +53,20 @@ export function BolusForm({
   settings,
   recentMeals,
   urlPrefill,
+  initialMealContext,
+  linkedMealMissing,
   latestGlucose,
   latestGlucoseMeasuredAt,
 }: BolusFormProps) {
   const ready = useMemo(() => bolusSettingsReady(settings), [settings]);
+
+  const [mealContextDisplay, setMealContextDisplay] = useState<
+    BolusMealContext | null
+  >(() => initialMealContext);
+
+  const [insulinLinkedMealId, setInsulinLinkedMealId] = useState<
+    string | null
+  >(() => (linkedMealMissing ? null : urlPrefill.linkedMealId));
 
   const [carbs, setCarbs] = useState(() => urlPrefill.carbs);
   const [glucose, setGlucose] = useState(() => {
@@ -95,9 +117,22 @@ export function BolusForm({
     estimate.totalBolus > 0
       ? buildInsulinPrefillHref({
           totalBolus: estimate.totalBolus,
-          linkedMealId: urlPrefill.linkedMealId,
+          linkedMealId: insulinLinkedMealId,
         })
       : null;
+
+  const urlCarbsParsed =
+    urlPrefill.carbs.trim() === ""
+      ? null
+      : Number.parseFloat(urlPrefill.carbs.replace(",", "."));
+
+  const showJournalVsUrlCarbsHint =
+    mealContextDisplay != null &&
+    urlPrefill.linkedMealId != null &&
+    insulinLinkedMealId === urlPrefill.linkedMealId &&
+    urlCarbsParsed != null &&
+    Number.isFinite(urlCarbsParsed) &&
+    Math.abs(urlCarbsParsed - mealContextDisplay.carbsGrams) > 0.01;
 
   return (
     <div className="space-y-6">
@@ -117,6 +152,66 @@ export function BolusForm({
       ) : null}
 
       <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4 space-y-4">
+        <div className="space-y-2">
+          {mealContextDisplay ? (
+            <>
+              <p className="text-xs font-medium uppercase tracking-wide text-emerald-200/90">
+                Расчёт для приёма пищи
+              </p>
+              <div
+                className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-3 text-sm"
+                role="status"
+              >
+                <p className="font-semibold text-white">
+                  {mealContextDisplay.mealTypeLabel}
+                </p>
+                <p className="mt-0.5 text-white/65">
+                  {mealContextDisplay.eatenAtDisplay}
+                </p>
+                <p className="mt-2 text-white/80">
+                  Углеводы по журналу для этого приёма:{" "}
+                  <span className="tabular-nums font-medium text-white">
+                    {mealContextDisplay.carbsGrams} г
+                  </span>
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-white/50">
+                  Значение в поле «Углеводы» ниже вы вводите или подставляете
+                  сами — оно участвует в расчёте. Цифра выше показывает сумму
+                  из записи приёма пищи.
+                </p>
+                {showJournalVsUrlCarbsHint ? (
+                  <p className="mt-2 border-t border-white/10 pt-2 text-xs leading-relaxed text-amber-100/90">
+                    В журнале сейчас {mealContextDisplay.carbsGrams} г; из ссылки
+                    в поле подставлено {urlCarbsParsed} г. Перед расчётом
+                    проверьте, какое значение верное.
+                  </p>
+                ) : null}
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-xs font-medium uppercase tracking-wide text-white/45">
+                Ручной расчёт
+              </p>
+              <p className="text-xs leading-relaxed text-white/45">
+                Приём пищи из журнала не выбран. Углеводы и время ниже задаёте
+                вы; свяжите с записью, открыв помощник с карточки приёма или
+                нажав недавний приём.
+              </p>
+              {linkedMealMissing ? (
+                <p
+                  className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100/95"
+                  role="status"
+                >
+                  Запись приёма из ссылки не найдена (возможно, удалена).
+                  Углеводы в поле могли прийти только из ссылки — проверьте
+                  перед расчётом.
+                </p>
+              ) : null}
+            </>
+          )}
+        </div>
+
         {recentMeals.length > 0 ? (
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-white/45">
@@ -131,6 +226,8 @@ export function BolusForm({
                   key={m.id}
                   type="button"
                   onClick={() => {
+                    setMealContextDisplay(recentOptionToContext(m));
+                    setInsulinLinkedMealId(m.id);
                     setCarbs(String(m.totalCarbs));
                     clearResult();
                   }}

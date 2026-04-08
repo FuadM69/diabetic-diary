@@ -3,9 +3,9 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { getCurrentUser } from "@/lib/auth/getUser";
 import { getLatestGlucoseEntry } from "@/lib/db/glucose";
-import { getRecentMealEntries } from "@/lib/db/meals";
+import { getMealEntryDetails, getRecentMealEntries } from "@/lib/db/meals";
 import { getUserSettings } from "@/lib/db/settings";
-import type { BolusRecentMealOption } from "@/lib/types/bolus";
+import type { BolusMealContext, BolusRecentMealOption } from "@/lib/types/bolus";
 import type { MealEntryWithItems, MealTypeKey } from "@/lib/types/meal";
 import { MEAL_TYPE_LABEL_RU } from "@/lib/types/meal";
 import {
@@ -13,6 +13,7 @@ import {
   parseBolusUrlPrefill,
 } from "@/lib/utils/bolus-prefill";
 import { bolusSettingsReady } from "@/lib/utils/bolus-form";
+import { formatGlucoseDate } from "@/lib/utils/glucose";
 import { sumCarbsFromItems } from "@/lib/utils/meal-nutrition";
 import { BolusForm } from "./_components/bolus-form";
 import { CALLOUT_SUBTLE, INTRO_TEXT, PAGE_CONTAINER } from "@/lib/ui/page-patterns";
@@ -40,6 +41,43 @@ function toRecentMealOptions(
   });
 }
 
+async function resolveBolusMealContextFromUrl(
+  userId: string,
+  linkedMealId: string | null,
+  recentMealsRaw: MealEntryWithItems[]
+): Promise<{
+  initialMealContext: BolusMealContext | null;
+  linkedMealMissing: boolean;
+}> {
+  if (!linkedMealId) {
+    return { initialMealContext: null, linkedMealMissing: false };
+  }
+
+  const fromRecent = recentMealsRaw.find((m) => m.id === linkedMealId);
+  const meal =
+    fromRecent ?? (await getMealEntryDetails(userId, linkedMealId));
+
+  if (!meal) {
+    return { initialMealContext: null, linkedMealMissing: true };
+  }
+
+  const mealTypeLabel =
+    meal.meal_type in MEAL_TYPE_LABEL_RU
+      ? MEAL_TYPE_LABEL_RU[meal.meal_type as MealTypeKey]
+      : meal.meal_type;
+
+  const carbsGrams = sumCarbsFromItems(meal.meal_items);
+
+  return {
+    initialMealContext: {
+      mealTypeLabel,
+      eatenAtDisplay: formatGlucoseDate(meal.eaten_at),
+      carbsGrams,
+    },
+    linkedMealMissing: false,
+  };
+}
+
 export default async function BolusPage({ searchParams }: BolusPageProps) {
   const user = await getCurrentUser();
   if (!user) {
@@ -58,6 +96,13 @@ export default async function BolusPage({ searchParams }: BolusPageProps) {
 
   const recentMeals = toRecentMealOptions(recentMealsRaw);
   const bolusMathReady = bolusSettingsReady(settings);
+
+  const { initialMealContext, linkedMealMissing } =
+    await resolveBolusMealContextFromUrl(
+      user.id,
+      urlPrefill.linkedMealId,
+      recentMealsRaw
+    );
 
   return (
     <AppShell title="Помощник болюса">
@@ -99,6 +144,8 @@ export default async function BolusPage({ searchParams }: BolusPageProps) {
           settings={settings}
           recentMeals={recentMeals}
           urlPrefill={urlPrefill}
+          initialMealContext={initialMealContext}
+          linkedMealMissing={linkedMealMissing}
           latestGlucose={
             latest && typeof latest.glucose_value === "number"
               ? latest.glucose_value
