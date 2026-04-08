@@ -14,6 +14,7 @@ import { getFoodProducts, getFoodProductsByIdsForUser } from "./food";
 import {
   caloriesFromPer100gAndGrams,
   carbsFromPer100gAndGrams,
+  sumCarbsFromItems,
 } from "@/lib/utils/meal-nutrition";
 
 const MEAL_ITEM_SELECT =
@@ -29,7 +30,7 @@ export async function getSelectableFoodProducts(
 }
 
 export type CreateMealResult =
-  | { ok: true; mealId: string }
+  | { ok: true; mealId: string; totalCarbs: number }
   | { ok: false; errorMessage: string };
 
 export async function createMealEntry(
@@ -102,7 +103,8 @@ export async function createMealEntry(
     };
   }
 
-  return { ok: true, mealId };
+  const totalCarbs = sumCarbsFromItems(itemRows);
+  return { ok: true, mealId, totalCarbs };
 }
 
 function assembleMealsWithItems(
@@ -323,4 +325,175 @@ export async function getMealEntryDetails(
     productNames
   );
   return assembled ?? null;
+}
+
+export type MealMutationResult =
+  | { ok: true }
+  | { ok: false; errorMessage: string };
+
+/**
+ * Updates header and replaces all `meal_items` for the meal.
+ * Rolls back header + items if the new item insert fails.
+ */
+export async function updateMealEntry(
+  userId: string,
+  mealEntryId: string,
+  payload: MealCreateInput
+): Promise<MealMutationResult> {
+  const supabase = await createClient();
+
+  const existing = await getMealEntryDetails(userId, mealEntryId);
+  if (!existing) {
+    return {
+      ok: false,
+      errorMessage: "Приём пищи не найден или нет прав на изменение.",
+    };
+  }
+
+  const productIds = [...new Set(payload.items.map((i) => i.food_product_id))];
+  let productMap: Map<string, FoodProduct>;
+  try {
+    productMap = await getFoodProductsByIdsForUser(userId, productIds);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Ошибка загрузки продуктов.";
+    return { ok: false, errorMessage: msg };
+  }
+
+  for (const id of productIds) {
+    if (!productMap.has(id)) {
+      return {
+        ok: false,
+        errorMessage:
+          "Один из продуктов недоступен или удалён. Обновите список блюд.",
+      };
+    }
+  }
+
+  const snapshotHeader = {
+    eaten_at: existing.eaten_at,
+    meal_type: existing.meal_type,
+    note: existing.note,
+  };
+  const snapshotItemRows = existing.meal_items.map((it) => ({
+    user_id: userId,
+    meal_entry_id: mealEntryId,
+    food_product_id: it.food_product_id,
+    grams: it.grams,
+    carbs_total: it.carbs_total,
+    calories_total: it.calories_total,
+  }));
+
+  const { error: upErr } = await supabase
+    .from("meal_entries")
+    .update({
+      eaten_at: payload.eaten_at,
+      meal_type: payload.meal_type,
+      note: payload.note,
+    })
+    .eq("id", mealEntryId)
+    .eq("user_id", userId);
+
+  if (upErr) {
+    return {
+      ok: false,
+      errorMessage: upErr.message || "Не удалось обновить приём пищи.",
+    };
+  }
+
+  const { error: delErr } = await supabase
+    .from("meal_items")
+    .delete()
+    .eq("meal_entry_id", mealEntryId)
+    .eq("user_id", userId);
+
+  if (delErr) {
+    await supabase
+      .from("meal_entries")
+      .update(snapshotHeader)
+      .eq("id", mealEntryId)
+      .eq("user_id", userId);
+    return {
+      ok: false,
+      errorMessage: delErr.message || "Не удалось обновить состав блюда.",
+    };
+  }
+
+  const itemRows = payload.items.map((item) => {
+    const p = productMap.get(item.food_product_id)!;
+    return {
+      user_id: userId,
+      meal_entry_id: mealEntryId,
+      food_product_id: item.food_product_id,
+      grams: item.grams,
+      carbs_total: carbsFromPer100gAndGrams(p.carbs_per_100g, item.grams),
+      calories_total: caloriesFromPer100gAndGrams(
+        p.calories_per_100g,
+        item.grams
+      ),
+    };
+  });
+
+  const { error: insErr } = await supabase.from("meal_items").insert(itemRows);
+
+  if (insErr) {
+    await supabase
+      .from("meal_entries")
+      .update(snapshotHeader)
+      .eq("id", mealEntryId)
+      .eq("user_id", userId);
+    if (snapshotItemRows.length > 0) {
+      await supabase.from("meal_items").insert(snapshotItemRows);
+    }
+    return {
+      ok: false,
+      errorMessage: insErr.message || "Не удалось сохранить состав блюда.",
+    };
+  }
+
+  return { ok: true };
+}
+
+/** Deletes `meal_items` for the meal, then the `meal_entries` row (scoped by user). */
+export async function deleteMealEntry(
+  userId: string,
+  mealEntryId: string
+): Promise<MealMutationResult> {
+  const supabase = await createClient();
+
+  const { error: itemsErr } = await supabase
+    .from("meal_items")
+    .delete()
+    .eq("meal_entry_id", mealEntryId)
+    .eq("user_id", userId);
+
+  if (itemsErr) {
+    return {
+      ok: false,
+      errorMessage: itemsErr.message || "Не удалось удалить позиции блюда.",
+    };
+  }
+
+  const { data, error: mealErr } = await supabase
+    .from("meal_entries")
+    .delete()
+    .eq("id", mealEntryId)
+    .eq("user_id", userId)
+    .select("id")
+    .maybeSingle();
+
+  if (mealErr) {
+    return {
+      ok: false,
+      errorMessage: mealErr.message || "Не удалось удалить приём пищи.",
+    };
+  }
+
+  if (!data) {
+    return {
+      ok: false,
+      errorMessage: "Приём пищи не найден или уже удалён.",
+    };
+  }
+
+  return { ok: true };
 }

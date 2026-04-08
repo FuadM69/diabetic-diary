@@ -23,7 +23,8 @@ export default async function MealsPage() {
     getSelectableFoodProducts(user.id),
   ]);
 
-  const formKey = `${meals.length}|${products.length}`;
+  /** Stable across new rows in the journal so the create form keeps success UI after save. */
+  const createFormKey = `meal-create|${products.length}`;
   const defaultEatenAt = formatDatetimeLocalValue(new Date());
 
   return (
@@ -43,14 +44,14 @@ export default async function MealsPage() {
           <h2 className="text-sm font-medium text-white/85">Новый приём пищи</h2>
           <MealForm
             products={products}
-            formKey={formKey}
+            formKey={createFormKey}
             defaultEatenAt={defaultEatenAt}
           />
         </section>
 
-        <section className="space-y-3">
+        <section id="meal-journal" className="scroll-mt-24 space-y-3">
           <h2 className={SECTION_TITLE}>Журнал</h2>
-          <MealList meals={meals} />
+          <MealList meals={meals} products={products} />
         </section>
       </div>
     </AppShell>

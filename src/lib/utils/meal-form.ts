@@ -10,6 +10,12 @@ export type ParseMealFormResult =
   | { ok: true; data: MealCreateInput }
   | { ok: false; message: string };
 
+export type MealUpdateParsed = MealCreateInput & { mealEntryId: string };
+
+export type ParseMealUpdateFormResult =
+  | { ok: true; data: MealUpdateParsed }
+  | { ok: false; message: string };
+
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -63,7 +69,21 @@ function isUuid(id: string): boolean {
   return UUID_RE.test(id);
 }
 
-export function parseMealCreationForm(
+/** Validates meal id from FormData (edit/delete). */
+export function parseMealEntryId(
+  raw: FormDataEntryValue | null
+): { ok: true; mealEntryId: string } | { ok: false; message: string } {
+  if (raw === null || typeof raw !== "string") {
+    return { ok: false, message: "Не указан приём пищи." };
+  }
+  const id = raw.trim();
+  if (!id || !isUuid(id)) {
+    return { ok: false, message: "Не указан приём пищи." };
+  }
+  return { ok: true, mealEntryId: id };
+}
+
+function parseMealItemsAndMeta(
   formData: FormData,
   savedTimezone: string | null
 ): ParseMealFormResult {
@@ -166,6 +186,36 @@ export function parseMealCreationForm(
       meal_type: mt.value,
       note: noteP.value,
       items,
+    },
+  };
+}
+
+export function parseMealCreationForm(
+  formData: FormData,
+  savedTimezone: string | null
+): ParseMealFormResult {
+  return parseMealItemsAndMeta(formData, savedTimezone);
+}
+
+export function parseMealUpdateForm(
+  formData: FormData,
+  savedTimezone: string | null
+): ParseMealUpdateFormResult {
+  const idParsed = parseMealEntryId(formData.get("mealEntryId"));
+  if (!idParsed.ok) {
+    return { ok: false, message: idParsed.message };
+  }
+
+  const body = parseMealItemsAndMeta(formData, savedTimezone);
+  if (!body.ok) {
+    return body;
+  }
+
+  return {
+    ok: true,
+    data: {
+      mealEntryId: idParsed.mealEntryId,
+      ...body.data,
     },
   };
 }
