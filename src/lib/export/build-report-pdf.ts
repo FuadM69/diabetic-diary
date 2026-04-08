@@ -11,6 +11,7 @@ import type { GlucoseEntry, GlucoseRangeKey, GlucoseStats } from "@/lib/types/gl
 import type { InsulinEntry } from "@/lib/types/insulin";
 import type { MealEntryWithItems } from "@/lib/types/meal";
 import { MEAL_TYPE_LABEL_RU, type MealTypeKey } from "@/lib/types/meal";
+import { formatUtcIsoForUserDisplay } from "@/lib/utils/datetime-local-tz";
 import {
   formatGlucoseDate,
   formatGlucoseValue,
@@ -39,6 +40,8 @@ export type BuildReportPdfParams = {
   glucoseEntries: GlucoseEntry[];
   insulinEntries: InsulinEntry[];
   meals: MealEntryWithItems[];
+  /** Profile timezone for insulin timestamps in the PDF (same as app cards). */
+  userDisplayTimezone: string | null;
 };
 
 function mealTypeLabel(mealType: string): string {
@@ -152,7 +155,11 @@ function writeGlucoseTable(doc: PdfDoc, entries: GlucoseEntry[]): void {
   doc.moveDown(0.6);
 }
 
-function writeInsulinTable(doc: PdfDoc, entries: InsulinEntry[]): void {
+function writeInsulinTable(
+  doc: PdfDoc,
+  entries: InsulinEntry[],
+  userDisplayTimezone: string | null
+): void {
   heading(doc, "Инсулин");
   if (entries.length === 0) {
     noDataLine(doc);
@@ -180,13 +187,12 @@ function writeInsulinTable(doc: PdfDoc, entries: InsulinEntry[]): void {
   for (const e of slice) {
     pageBreakIfNeeded(doc, 36);
     const typeRu = INSULIN_ENTRY_TYPE_LABEL_RU[e.entry_type];
-    const line = `${formatGlucoseDate(e.taken_at)}   ${truncateCell(
-      e.insulin_name,
-      24
-    )} · ${typeRu} · ${formatInsulinUnits(e.units)} ед.   ${truncateCell(
-      e.note,
-      40
-    )}`;
+    const line = `${formatUtcIsoForUserDisplay(
+      e.taken_at,
+      userDisplayTimezone
+    )}   ${truncateCell(e.insulin_name, 24)} · ${typeRu} · ${formatInsulinUnits(
+      e.units
+    )} ед.   ${truncateCell(e.note, 40)}`;
     doc.text(line, { width: doc.page.width - MARGIN * 2, lineGap: 1 });
   }
   doc.moveDown(0.6);
@@ -247,6 +253,7 @@ function renderReport(doc: PdfDoc, params: BuildReportPdfParams): void {
     glucoseEntries,
     insulinEntries,
     meals,
+    userDisplayTimezone,
   } = params;
 
   doc.registerFont("Report", FONT_REG);
@@ -255,7 +262,7 @@ function renderReport(doc: PdfDoc, params: BuildReportPdfParams): void {
   writeMeta(doc, rangeKey, generatedAt);
   writeGlucoseSummary(doc, glucoseStats);
   writeGlucoseTable(doc, glucoseEntries);
-  writeInsulinTable(doc, insulinEntries);
+  writeInsulinTable(doc, insulinEntries, userDisplayTimezone);
   writeMealsTable(doc, meals);
   writeFooter(doc);
 }

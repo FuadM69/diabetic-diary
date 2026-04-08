@@ -85,6 +85,36 @@ export function utcIsoToDatetimeLocalInUserTimezone(
   return { ok: true, value: local };
 }
 
+/** Matches `formatGlucoseDate` styling so insulin rows look like glucose rows. */
+const USER_DISPLAY_DATETIME_DEFAULTS = {
+  dateStyle: "medium" as const,
+  timeStyle: "short" as const,
+};
+
+/**
+ * Human-readable date/time for diary UI (cards, lists, exports) using the user’s
+ * **saved** timezone when it resolves; otherwise same fallback as legacy
+ * `formatGlucoseDate` (runtime locale, no fixed IANA).
+ */
+export function formatUtcIsoForUserDisplay(
+  iso: string,
+  savedTimezone: string | null | undefined,
+  options: Intl.DateTimeFormatOptions = USER_DISPLAY_DATETIME_DEFAULTS
+): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    return iso;
+  }
+  const tzRes = resolveTimezoneForFormDatetime(savedTimezone);
+  if (!tzRes.ok) {
+    return new Intl.DateTimeFormat(undefined, options).format(d);
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    ...options,
+    timeZone: tzRes.iana,
+  }).format(d);
+}
+
 type WallParts = ReturnType<typeof readZonedWallClockParts>;
 
 function compareWallParts(a: WallParts, b: WallParts): number {

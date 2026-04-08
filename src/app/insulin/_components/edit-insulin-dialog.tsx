@@ -9,7 +9,10 @@ import {
 } from "react";
 import { useFormStatus } from "react-dom";
 import { INSULIN_ENTRY_TYPES, type InsulinEntry } from "@/lib/types/insulin";
-import { utcIsoToDatetimeLocalInUserTimezone } from "@/lib/utils/datetime-local-tz";
+import {
+  formatUtcIsoForUserDisplay,
+  utcIsoToDatetimeLocalInUserTimezone,
+} from "@/lib/utils/datetime-local-tz";
 import { INSULIN_ENTRY_TYPE_LABEL_RU } from "@/lib/utils/insulin";
 import {
   updateInsulinEntryAction,
@@ -68,6 +71,28 @@ function EditFormBody({
       onSuccess();
     }
   }, [state.success, onSuccess]);
+
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_INSULIN_DEBUG === "1") {
+      console.log("[insulin][edit-dialog][tz]", {
+        entryId: entry.id,
+        rawTakenAtUtc: entry.taken_at,
+        userTimezoneSetting: userTimezone,
+        datetimeLocalPrefill: takenAtDefault,
+        labelForDisplay: formatUtcIsoForUserDisplay(
+          entry.taken_at,
+          userTimezone
+        ),
+        parseOk: takenAtParsed.ok,
+      });
+    }
+  }, [
+    entry.id,
+    entry.taken_at,
+    userTimezone,
+    takenAtDefault,
+    takenAtParsed.ok,
+  ]);
 
   return (
     <form action={formAction} className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">

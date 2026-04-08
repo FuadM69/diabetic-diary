@@ -56,6 +56,7 @@ export async function GET(request: Request) {
       glucoseEntries,
       insulinEntries,
       meals,
+      userDisplayTimezone: settings.timezone,
     });
 
     const filename = pdfReportFilename(range);

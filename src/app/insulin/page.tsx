@@ -3,7 +3,10 @@ import { AppShell } from "@/components/layout/app-shell";
 import { getCurrentUser } from "@/lib/auth/getUser";
 import { getInsulinEntries } from "@/lib/db/insulin";
 import { getUserSettings } from "@/lib/db/settings";
-import { defaultDatetimeLocalForUserSettings } from "@/lib/utils/datetime-local-tz";
+import {
+  defaultDatetimeLocalForUserSettings,
+  formatUtcIsoForUserDisplay,
+} from "@/lib/utils/datetime-local-tz";
 import {
   getGlucoseRangeMeasuredAtLowerBound,
   parseGlucoseRangeParam,
@@ -55,6 +58,17 @@ export default async function InsulinPage({ searchParams }: InsulinPageProps) {
       JSON.stringify(queryPrefill)
     );
     console.log("[insulin][page] default taken_at local:", takenAtDefault);
+    const sample = entries[0];
+    if (sample) {
+      console.log("[insulin][page][tz-display]", {
+        rawTakenAtUtc: sample.taken_at,
+        userSettingsTimezone: settings.timezone,
+        formattedForCard: formatUtcIsoForUserDisplay(
+          sample.taken_at,
+          settings.timezone
+        ),
+      });
+    }
   }
 
   return (

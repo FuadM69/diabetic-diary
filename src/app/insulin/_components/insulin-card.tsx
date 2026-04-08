@@ -1,5 +1,5 @@
 import type { InsulinEntry, InsulinEntryType } from "@/lib/types/insulin";
-import { formatGlucoseDate } from "@/lib/utils/glucose";
+import { formatUtcIsoForUserDisplay } from "@/lib/utils/datetime-local-tz";
 import {
   formatInsulinUnits,
   INSULIN_ENTRY_TYPE_LABEL_RU,
@@ -55,7 +55,9 @@ export function InsulinCard({ entry, userTimezone }: InsulinCardProps) {
           {entry.insulin_name ? (
             <p className="truncate text-sm text-white/60">{entry.insulin_name}</p>
           ) : null}
-          <p className="text-xs text-white/48">{formatGlucoseDate(entry.taken_at)}</p>
+          <p className="text-xs text-white/48">
+            {formatUtcIsoForUserDisplay(entry.taken_at, userTimezone)}
+          </p>
         </div>
       </div>
 
