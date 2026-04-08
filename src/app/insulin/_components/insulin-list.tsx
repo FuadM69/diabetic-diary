@@ -1,5 +1,6 @@
 import type { GlucoseRangeKey } from "@/lib/types/glucose";
 import type { InsulinEntry } from "@/lib/types/insulin";
+import { GLUCOSE_RANGE_LABEL } from "@/lib/utils/glucose";
 import { getInsulinListEmptyMessage } from "@/lib/utils/insulin";
 import { EmptyState } from "@/components/ui/empty-state";
 import { InsulinCard } from "./insulin-card";
@@ -10,7 +11,12 @@ type InsulinListProps = {
   userTimezone: string | null;
 };
 
-export function InsulinList({ entries, range, userTimezone }: InsulinListProps) {
+export function InsulinList({
+  entries,
+  range,
+  userTimezone,
+}: InsulinListProps) {
+  const rangeLabel = GLUCOSE_RANGE_LABEL[range];
   if (entries.length === 0) {
     const empty = getInsulinListEmptyMessage(range);
     const action =
@@ -33,6 +39,8 @@ export function InsulinList({ entries, range, userTimezone }: InsulinListProps) 
           key={entry.id}
           entry={entry}
           userTimezone={userTimezone}
+          activeRange={range}
+          activeRangeLabel={rangeLabel}
         />
       ))}
     </ul>

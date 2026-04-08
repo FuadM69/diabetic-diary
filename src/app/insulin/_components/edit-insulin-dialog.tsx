@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   useActionState,
   useCallback,
@@ -8,17 +9,21 @@ import {
   useState,
 } from "react";
 import { useFormStatus } from "react-dom";
+import type { GlucoseRangeKey } from "@/lib/types/glucose";
 import { INSULIN_ENTRY_TYPES, type InsulinEntry } from "@/lib/types/insulin";
 import {
   formatUtcIsoForUserDisplay,
   utcIsoToDatetimeLocalInUserTimezone,
 } from "@/lib/utils/datetime-local-tz";
-import { INSULIN_ENTRY_TYPE_LABEL_RU } from "@/lib/utils/insulin";
+import {
+  getInsulinTakenAtTimezoneCaption,
+  INSULIN_ENTRY_TYPE_LABEL_RU,
+} from "@/lib/utils/insulin";
 import {
   updateInsulinEntryAction,
   type InsulinActionResult,
 } from "../actions";
-import { FEEDBACK_ERROR } from "@/lib/ui/page-patterns";
+import { FEEDBACK_ERROR, FEEDBACK_SUCCESS } from "@/lib/ui/page-patterns";
 
 const initialState: InsulinActionResult = {
   success: false,
@@ -26,7 +31,7 @@ const initialState: InsulinActionResult = {
 };
 
 const inputClass =
-  "mt-2 w-full rounded-2xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none focus:border-white/35 disabled:opacity-60";
+  "mt-2 w-full rounded-2xl border border-white/15 bg-black/50 px-4 py-3 text-base text-white outline-none focus:border-white/35 disabled:opacity-60";
 
 function SaveButton({ disabled }: { disabled: boolean }) {
   const { pending } = useFormStatus();
@@ -44,11 +49,15 @@ function SaveButton({ disabled }: { disabled: boolean }) {
 function EditFormBody({
   entry,
   userTimezone,
+  activeRange,
+  activeRangeLabel,
   onSuccess,
   onCancel,
 }: {
   entry: InsulinEntry;
   userTimezone: string | null;
+  activeRange: GlucoseRangeKey;
+  activeRangeLabel: string;
   onSuccess: () => void;
   onCancel: () => void;
 }) {
@@ -66,11 +75,10 @@ function EditFormBody({
     initialState
   );
 
-  useEffect(() => {
-    if (state.success) {
-      onSuccess();
-    }
-  }, [state.success, onSuccess]);
+  const takenAtTzCaption = getInsulinTakenAtTimezoneCaption(userTimezone);
+  const editSaved =
+    state.success &&
+    Boolean(state.savedEntryTypeLabel && state.savedTakenAtDisplay);
 
   useEffect(() => {
     if (process.env.NEXT_PUBLIC_INSULIN_DEBUG === "1") {
@@ -98,114 +106,159 @@ function EditFormBody({
     <form action={formAction} className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
       <input type="hidden" name="entryId" value={entry.id} />
 
-      {timezoneFieldError ? (
+      {editSaved && state.savedEntryTypeLabel && state.savedTakenAtDisplay ? (
+        <div className="space-y-3">
+          <p role="status" className={FEEDBACK_SUCCESS}>
+            Запись сохранена:{" "}
+            <strong className="font-medium">{state.savedEntryTypeLabel}</strong>
+            {", "}
+            <span className="tabular-nums">{state.savedTakenAtDisplay}</span> —
+            как в журнале (время по настройкам профиля).
+            {activeRange !== "all" ? (
+              <>
+                {" "}
+                Список ниже сейчас ограничен периодом «{activeRangeLabel}» —
+                запись появится только если эта дата не раньше нижней границы
+                фильтра. Иначе откройте{" "}
+                <Link
+                  href="/insulin?range=all"
+                  className="font-medium text-emerald-200/95 underline decoration-emerald-400/40 underline-offset-2"
+                >
+                  всё время
+                </Link>
+                .
+              </>
+            ) : (
+              <> Список ниже показывает весь журнал.</>
+            )}
+          </p>
+          <button
+            type="button"
+            onClick={onSuccess}
+            className="w-full rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-black"
+          >
+            Закрыть
+          </button>
+        </div>
+      ) : null}
+
+      {!editSaved && timezoneFieldError ? (
         <p role="alert" className={FEEDBACK_ERROR}>
           {timezoneFieldError}
         </p>
       ) : null}
 
-      <div>
-        <label htmlFor={`insulin-taken-${entry.id}`} className="text-sm text-white/70">
-          Когда введено
-        </label>
-        <input
-          id={`insulin-taken-${entry.id}`}
-          name="taken_at"
-          type="datetime-local"
-          required
-          defaultValue={takenAtDefault}
-          disabled={isPending || blockEdit}
-          className={inputClass}
-        />
-      </div>
-
-      <fieldset className="space-y-2">
-        <legend className="text-sm text-white/70">Тип</legend>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          {INSULIN_ENTRY_TYPES.map((key) => (
-            <label key={key} className="relative block cursor-pointer">
-              <input
-                type="radio"
-                name="entry_type"
-                value={key}
-                defaultChecked={entry.entry_type === key}
-                required={key === INSULIN_ENTRY_TYPES[0]}
-                disabled={isPending || blockEdit}
-                className="peer sr-only"
-              />
-              <span className="block rounded-2xl border border-white/15 bg-white/[0.04] px-3 py-3 text-center text-sm text-white/90 peer-checked:border-white peer-checked:bg-white peer-checked:font-medium peer-checked:text-black">
-                {INSULIN_ENTRY_TYPE_LABEL_RU[key]}
-              </span>
+      {!editSaved ? (
+        <>
+          <div>
+            <label htmlFor={`insulin-taken-${entry.id}`} className="text-sm text-white/70">
+              Когда введено
             </label>
-          ))}
-        </div>
-      </fieldset>
+            <input
+              id={`insulin-taken-${entry.id}`}
+              name="taken_at"
+              type="datetime-local"
+              required
+              defaultValue={takenAtDefault}
+              disabled={isPending || blockEdit}
+              className={inputClass}
+            />
+            {!blockEdit ? (
+              <p className="mt-1.5 text-xs leading-relaxed text-white/45">
+                {takenAtTzCaption}
+              </p>
+            ) : null}
+          </div>
 
-      <div>
-        <label htmlFor={`insulin-units-${entry.id}`} className="text-sm text-white/70">
-          Единицы (УЕ)
-        </label>
-        <input
-          id={`insulin-units-${entry.id}`}
-          name="units"
-          type="number"
-          inputMode="decimal"
-          min={0.05}
-          step="any"
-          required
-          defaultValue={entry.units}
-          disabled={isPending || blockEdit}
-          className={inputClass}
-        />
-      </div>
+          <fieldset className="space-y-2">
+            <legend className="text-sm text-white/70">Тип</legend>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              {INSULIN_ENTRY_TYPES.map((key) => (
+                <label key={key} className="relative block cursor-pointer">
+                  <input
+                    type="radio"
+                    name="entry_type"
+                    value={key}
+                    defaultChecked={entry.entry_type === key}
+                    required={key === INSULIN_ENTRY_TYPES[0]}
+                    disabled={isPending || blockEdit}
+                    className="peer sr-only"
+                  />
+                  <span className="block rounded-2xl border border-white/15 bg-white/[0.04] px-3 py-3 text-center text-sm text-white/90 peer-checked:border-white peer-checked:bg-white peer-checked:font-medium peer-checked:text-black">
+                    {INSULIN_ENTRY_TYPE_LABEL_RU[key]}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
 
-      <div>
-        <label htmlFor={`insulin-name-${entry.id}`} className="text-sm text-white/70">
-          Название инсулина{" "}
-          <span className="text-white/40">(необязательно)</span>
-        </label>
-        <input
-          id={`insulin-name-${entry.id}`}
-          name="insulin_name"
-          type="text"
-          defaultValue={entry.insulin_name ?? ""}
-          disabled={isPending || blockEdit}
-          className={inputClass}
-        />
-      </div>
+          <div>
+            <label htmlFor={`insulin-units-${entry.id}`} className="text-sm text-white/70">
+              Единицы (УЕ)
+            </label>
+            <input
+              id={`insulin-units-${entry.id}`}
+              name="units"
+              type="number"
+              inputMode="decimal"
+              min={0.05}
+              step="any"
+              required
+              defaultValue={entry.units}
+              disabled={isPending || blockEdit}
+              className={inputClass}
+            />
+          </div>
 
-      <div>
-        <label htmlFor={`insulin-note-${entry.id}`} className="text-sm text-white/70">
-          Заметка{" "}
-          <span className="text-white/40">(необязательно)</span>
-        </label>
-        <textarea
-          id={`insulin-note-${entry.id}`}
-          name="note"
-          rows={2}
-          defaultValue={entry.note ?? ""}
-          disabled={isPending || blockEdit}
-          className={`${inputClass} resize-none`}
-        />
-      </div>
+          <div>
+            <label htmlFor={`insulin-name-${entry.id}`} className="text-sm text-white/70">
+              Название инсулина{" "}
+              <span className="text-white/40">(необязательно)</span>
+            </label>
+            <input
+              id={`insulin-name-${entry.id}`}
+              name="insulin_name"
+              type="text"
+              defaultValue={entry.insulin_name ?? ""}
+              disabled={isPending || blockEdit}
+              className={inputClass}
+            />
+          </div>
 
-      {state.error ? (
-        <p role="alert" className={FEEDBACK_ERROR}>
-          {state.error}
-        </p>
+          <div>
+            <label htmlFor={`insulin-note-${entry.id}`} className="text-sm text-white/70">
+              Заметка{" "}
+              <span className="text-white/40">(необязательно)</span>
+            </label>
+            <textarea
+              id={`insulin-note-${entry.id}`}
+              name="note"
+              rows={2}
+              defaultValue={entry.note ?? ""}
+              disabled={isPending || blockEdit}
+              className={`${inputClass} resize-none`}
+            />
+          </div>
+
+          {state.error ? (
+            <p role="alert" className={FEEDBACK_ERROR}>
+              {state.error}
+            </p>
+          ) : null}
+
+          <div className="flex flex-wrap justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={isPending}
+              className="rounded-xl border border-white/20 px-4 py-2.5 text-sm text-white/85 hover:bg-white/5 disabled:opacity-60"
+            >
+              Отмена
+            </button>
+            <SaveButton disabled={blockEdit} />
+          </div>
+        </>
       ) : null}
-
-      <div className="flex flex-wrap justify-end gap-2 pt-1">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={isPending}
-          className="rounded-xl border border-white/20 px-4 py-2.5 text-sm text-white/85 hover:bg-white/5 disabled:opacity-60"
-        >
-          Отмена
-        </button>
-        <SaveButton disabled={blockEdit} />
-      </div>
     </form>
   );
 }
@@ -213,11 +266,15 @@ function EditFormBody({
 type EditInsulinDialogProps = {
   entry: InsulinEntry;
   userTimezone: string | null;
+  activeRange: GlucoseRangeKey;
+  activeRangeLabel: string;
 };
 
 export function EditInsulinDialog({
   entry,
   userTimezone,
+  activeRange,
+  activeRangeLabel,
 }: EditInsulinDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [session, setSession] = useState(0);
@@ -259,6 +316,8 @@ export function EditInsulinDialog({
           key={session}
           entry={entry}
           userTimezone={userTimezone}
+          activeRange={activeRange}
+          activeRangeLabel={activeRangeLabel}
           onSuccess={close}
           onCancel={close}
         />

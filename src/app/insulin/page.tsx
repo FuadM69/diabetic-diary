@@ -8,6 +8,7 @@ import {
   formatUtcIsoForUserDisplay,
 } from "@/lib/utils/datetime-local-tz";
 import {
+  GLUCOSE_RANGE_LABEL,
   getGlucoseRangeMeasuredAtLowerBound,
   parseGlucoseRangeParam,
 } from "@/lib/utils/glucose";
@@ -49,26 +50,21 @@ export default async function InsulinPage({ searchParams }: InsulinPageProps) {
 
   const entries = await getInsulinEntries(user.id, { takenAtGte });
   const queryPrefill = parseInsulinQueryPrefill(params);
-  const formKey = `${entries.length}-${range}-${queryPrefill ? `p-${queryPrefill.units}` : "np"}`;
+  /** Do not key the form by `entries.length` — it hid success feedback and confused users when back-dated rows were filtered out. */
+  const formKey = `${range}-${queryPrefill ? `p-${queryPrefill.units}` : "np"}`;
   const takenAtDefault = defaultDatetimeLocalForUserSettings(settings.timezone);
 
   if (isInsulinDebugLogEnabled()) {
     console.log(
-      "[insulin][page] query prefill:",
-      JSON.stringify(queryPrefill)
+      "[insulin][page]",
+      JSON.stringify({
+        range,
+        takenAtGte,
+        entryCount: entries.length,
+        queryPrefill,
+        takenAtDefault,
+      })
     );
-    console.log("[insulin][page] default taken_at local:", takenAtDefault);
-    const sample = entries[0];
-    if (sample) {
-      console.log("[insulin][page][tz-display]", {
-        rawTakenAtUtc: sample.taken_at,
-        userSettingsTimezone: settings.timezone,
-        formattedForCard: formatUtcIsoForUserDisplay(
-          sample.taken_at,
-          settings.timezone
-        ),
-      });
-    }
   }
 
   return (
@@ -76,6 +72,23 @@ export default async function InsulinPage({ searchParams }: InsulinPageProps) {
       <div className={PAGE_CONTAINER}>
         <header className="space-y-3">
           <InsulinRangeFilter activeRange={range} />
+          {range !== "all" && takenAtGte ? (
+            <p
+              className="rounded-2xl border border-amber-500/25 bg-amber-950/20 px-3 py-2 text-xs leading-relaxed text-amber-50/90"
+              role="note"
+            >
+              <strong className="font-medium text-amber-100">
+                Список обрезан фильтром «{GLUCOSE_RANGE_LABEL[range]}»
+              </strong>
+              . Показываются только введения <strong>не раньше</strong> этой
+              отметки (время введения, как в настройках профиля):{" "}
+              <span className="tabular-nums font-semibold text-white">
+                {formatUtcIsoForUserDisplay(takenAtGte, settings.timezone)}
+              </span>
+              . Более старые записи в таблице не скрыты навсегда — выберите
+              период «Всё время», чтобы увидеть полный журнал.
+            </p>
+          ) : null}
           <p className={INTRO_TEXT}>
             Журнал введений: базальный, болюс и коррекция. Запись здесь не
             означает автоматическую дозу — вы подтверждаете введение сами.
@@ -104,6 +117,9 @@ export default async function InsulinPage({ searchParams }: InsulinPageProps) {
             timezoneConfigError={
               takenAtDefault.ok ? null : takenAtDefault.message
             }
+            savedUserTimezone={settings.timezone}
+            activeRange={range}
+            activeRangeLabel={GLUCOSE_RANGE_LABEL[range]}
           />
         </section>
 

@@ -1,3 +1,4 @@
+import type { GlucoseRangeKey } from "@/lib/types/glucose";
 import type { InsulinEntry, InsulinEntryType } from "@/lib/types/insulin";
 import { formatUtcIsoForUserDisplay } from "@/lib/utils/datetime-local-tz";
 import {
@@ -28,10 +29,20 @@ const TYPE_PRESENTATION: Record<
 type InsulinCardProps = {
   entry: InsulinEntry;
   userTimezone: string | null;
+  activeRange: GlucoseRangeKey;
+  activeRangeLabel: string;
 };
 
-export function InsulinCard({ entry, userTimezone }: InsulinCardProps) {
-  const ui = TYPE_PRESENTATION[entry.entry_type];
+export function InsulinCard({
+  entry,
+  userTimezone,
+  activeRange,
+  activeRangeLabel,
+}: InsulinCardProps) {
+  const ui =
+    TYPE_PRESENTATION[entry.entry_type] ?? TYPE_PRESENTATION.bolus;
+  const typeLabel =
+    INSULIN_ENTRY_TYPE_LABEL_RU[entry.entry_type] ?? entry.entry_type;
 
   return (
     <li
@@ -49,7 +60,7 @@ export function InsulinCard({ entry, userTimezone }: InsulinCardProps) {
             <span
               className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${ui.badge}`}
             >
-              {INSULIN_ENTRY_TYPE_LABEL_RU[entry.entry_type]}
+              {typeLabel}
             </span>
           </div>
           {entry.insulin_name ? (
@@ -68,7 +79,12 @@ export function InsulinCard({ entry, userTimezone }: InsulinCardProps) {
       ) : null}
 
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-white/10 pt-3">
-        <EditInsulinDialog entry={entry} userTimezone={userTimezone} />
+        <EditInsulinDialog
+          entry={entry}
+          userTimezone={userTimezone}
+          activeRange={activeRange}
+          activeRangeLabel={activeRangeLabel}
+        />
         <DeleteInsulinButton entryId={entry.id} />
       </div>
     </li>
