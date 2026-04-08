@@ -19,3 +19,8 @@ export type FoodProductInsert = {
   protein_per_100g: number;
   fat_per_100g: number;
 };
+
+/** Update payload: same fields as insert plus row id (owned rows only in DB). */
+export type FoodProductUpdate = FoodProductInsert & {
+  productId: string;
+};

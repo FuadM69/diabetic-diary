@@ -6,7 +6,11 @@
  * `userId` is interpolated into `.or(...)` — must remain a trusted UUID from
  * auth (never raw user input).
  */
-import type { FoodProduct, FoodProductInsert } from "@/lib/types/food";
+import type {
+  FoodProduct,
+  FoodProductInsert,
+  FoodProductUpdate,
+} from "@/lib/types/food";
 import { createClient } from "@/lib/supabase/server";
 
 export type GetFoodProductsOptions = {
@@ -78,6 +82,58 @@ export async function createFoodProduct(
       ok: false,
       errorMessage:
         "Не удалось сохранить продукт. Проверьте права доступа к таблице.",
+    };
+  }
+
+  return { ok: true, row: data as FoodProduct };
+}
+
+export async function updateFoodProduct(
+  userId: string,
+  payload: FoodProductUpdate
+): Promise<CreateFoodProductResult> {
+  const supabase = await createClient();
+  const { productId, name, brand, carbs_per_100g, calories_per_100g, protein_per_100g, fat_per_100g } =
+    payload;
+
+  const { data, error } = await supabase
+    .from("food_products")
+    .update({
+      name,
+      brand,
+      carbs_per_100g,
+      calories_per_100g,
+      protein_per_100g,
+      fat_per_100g,
+    })
+    .eq("id", productId)
+    .eq("created_by", userId)
+    .select(
+      "id, name, brand, carbs_per_100g, calories_per_100g, protein_per_100g, fat_per_100g, created_by, is_public"
+    )
+    .maybeSingle();
+
+  if (process.env.FOOD_DEBUG === "1") {
+    console.log(
+      "[food][db][update]",
+      JSON.stringify({
+        productId,
+        userId,
+        error: error?.message ?? null,
+        returnedId: data?.id ?? null,
+      })
+    );
+  }
+
+  if (error) {
+    return { ok: false, errorMessage: error.message };
+  }
+
+  if (!data) {
+    return {
+      ok: false,
+      errorMessage:
+        "Продукт не найден или нет прав на изменение (общие продукты редактировать нельзя).",
     };
   }
 

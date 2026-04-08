@@ -1,9 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createFoodProduct } from "@/lib/db/food";
+import { createFoodProduct, updateFoodProduct } from "@/lib/db/food";
 import { createClient } from "@/lib/supabase/server";
-import { parseFoodProductForm } from "@/lib/utils/food-form";
+import {
+  parseFoodProductForm,
+  parseUpdateFoodProductForm,
+} from "@/lib/utils/food-form";
 
 export type FoodActionResult = {
   success: boolean;
@@ -43,6 +46,62 @@ export async function createFoodProductAction(
     return {
       success: false,
       error: result.errorMessage || "Не удалось сохранить продукт.",
+    };
+  }
+
+  revalidatePath("/food");
+  return { success: true, error: null };
+}
+
+export async function updateFoodProductAction(
+  formData: FormData
+): Promise<FoodActionResult> {
+  const parsed = parseUpdateFoodProductForm(formData);
+  if (!parsed.ok) {
+    return { success: false, error: parsed.message };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError) {
+    console.error("[food] update auth.getUser:", authError);
+    return {
+      success: false,
+      error: "Не удалось проверить вход. Попробуйте войти снова.",
+    };
+  }
+
+  if (!user) {
+    return { success: false, error: "Нужно войти в аккаунт." };
+  }
+
+  if (process.env.FOOD_DEBUG === "1") {
+    const { productId, ...fields } = parsed.data;
+    console.log(
+      "[food][update] payload:",
+      JSON.stringify({ productId, fields })
+    );
+  }
+
+  const result = await updateFoodProduct(user.id, parsed.data);
+
+  if (process.env.FOOD_DEBUG === "1") {
+    console.log(
+      "[food][update] result:",
+      result.ok ? `ok id=${result.row.id}` : result.errorMessage
+    );
+  }
+
+  if (!result.ok) {
+    console.error("[food] update failed:", result.errorMessage);
+    return {
+      success: false,
+      error:
+        result.errorMessage || "Не удалось сохранить изменения продукта.",
     };
   }
 

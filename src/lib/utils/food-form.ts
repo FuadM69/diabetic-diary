@@ -1,7 +1,11 @@
-import type { FoodProductInsert } from "@/lib/types/food";
+import type { FoodProductInsert, FoodProductUpdate } from "@/lib/types/food";
 
 export type ParseFoodProductFormResult =
   | { ok: true; data: FoodProductInsert }
+  | { ok: false; message: string };
+
+export type ParseUpdateFoodProductFormResult =
+  | { ok: true; data: FoodProductUpdate }
   | { ok: false; message: string };
 
 const NAME_MAX = 200;
@@ -73,6 +77,22 @@ function parseNutritionField(
   return { ok: true, value: n };
 }
 
+const PRODUCT_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function parseProductId(
+  raw: FormDataEntryValue | null
+): { ok: true; productId: string } | { ok: false; message: string } {
+  if (raw === null || typeof raw !== "string") {
+    return { ok: false, message: "Не указан продукт." };
+  }
+  const id = raw.trim();
+  if (!PRODUCT_ID_RE.test(id)) {
+    return { ok: false, message: "Некорректный идентификатор продукта." };
+  }
+  return { ok: true, productId: id };
+}
+
 export function parseFoodProductForm(
   formData: FormData
 ): ParseFoodProductFormResult {
@@ -124,6 +144,28 @@ export function parseFoodProductForm(
       calories_per_100g: calP.value,
       protein_per_100g: protP.value,
       fat_per_100g: fatP.value,
+    },
+  };
+}
+
+export function parseUpdateFoodProductForm(
+  formData: FormData
+): ParseUpdateFoodProductFormResult {
+  const idP = parseProductId(formData.get("productId"));
+  if (!idP.ok) {
+    return idP;
+  }
+
+  const base = parseFoodProductForm(formData);
+  if (!base.ok) {
+    return base;
+  }
+
+  return {
+    ok: true,
+    data: {
+      productId: idP.productId,
+      ...base.data,
     },
   };
 }

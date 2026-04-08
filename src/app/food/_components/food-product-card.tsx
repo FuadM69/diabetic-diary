@@ -1,10 +1,17 @@
 import type { FoodProduct } from "@/lib/types/food";
+import { EditFoodProductDialog } from "./edit-food-product-dialog";
 
 type FoodProductCardProps = {
   product: FoodProduct;
 };
 
+/** Only user-created private rows can be updated (not the public catalog). */
+function canEditFoodProduct(product: FoodProduct): boolean {
+  return !product.is_public && product.created_by != null;
+}
+
 export function FoodProductCard({ product }: FoodProductCardProps) {
+  const showEdit = canEditFoodProduct(product);
   const brandLine = product.brand ? (
     <p className="text-xs text-white/50">{product.brand}</p>
   ) : null;
@@ -57,6 +64,11 @@ export function FoodProductCard({ product }: FoodProductCardProps) {
           <dd className="tabular-nums text-white/70">{product.fat_per_100g} г</dd>
         </div>
       </dl>
+      {showEdit ? (
+        <div className="mt-3 border-t border-white/10 pt-3">
+          <EditFoodProductDialog product={product} />
+        </div>
+      ) : null}
     </li>
   );
 }
