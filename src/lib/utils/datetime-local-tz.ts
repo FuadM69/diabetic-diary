@@ -91,6 +91,41 @@ const USER_DISPLAY_DATETIME_DEFAULTS = {
   timeStyle: "short" as const,
 };
 
+const DATE_TIME_FORMAT_OPTION_KEYS = new Set<keyof Intl.DateTimeFormatOptions>([
+  "localeMatcher",
+  "calendar",
+  "numberingSystem",
+  "hour12",
+  "hourCycle",
+  "timeZone",
+  "weekday",
+  "era",
+  "year",
+  "month",
+  "day",
+  "dayPeriod",
+  "hour",
+  "minute",
+  "second",
+  "fractionalSecondDigits",
+  "timeZoneName",
+  "formatMatcher",
+  "dateStyle",
+  "timeStyle",
+]);
+
+function sanitizeDateTimeFormatOptions(
+  options: Intl.DateTimeFormatOptions
+): Intl.DateTimeFormatOptions {
+  const safe: Intl.DateTimeFormatOptions = {};
+  for (const [key, value] of Object.entries(options)) {
+    if (DATE_TIME_FORMAT_OPTION_KEYS.has(key as keyof Intl.DateTimeFormatOptions)) {
+      (safe as Record<string, unknown>)[key] = value;
+    }
+  }
+  return safe;
+}
+
 /**
  * Human-readable date/time for diary UI (cards, lists, exports) using the user’s
  * **saved** timezone when it resolves; otherwise same fallback as legacy
@@ -105,14 +140,25 @@ export function formatUtcIsoForUserDisplay(
   if (Number.isNaN(d.getTime())) {
     return iso;
   }
+  const safeOptions = sanitizeDateTimeFormatOptions(options);
   const tzRes = resolveTimezoneForFormDatetime(savedTimezone);
-  if (!tzRes.ok) {
-    return new Intl.DateTimeFormat(undefined, options).format(d);
+  try {
+    if (!tzRes.ok) {
+      return new Intl.DateTimeFormat(undefined, safeOptions).format(d);
+    }
+    return new Intl.DateTimeFormat(undefined, {
+      ...safeOptions,
+      timeZone: tzRes.iana,
+    }).format(d);
+  } catch {
+    if (!tzRes.ok) {
+      return new Intl.DateTimeFormat(undefined, USER_DISPLAY_DATETIME_DEFAULTS).format(d);
+    }
+    return new Intl.DateTimeFormat(undefined, {
+      ...USER_DISPLAY_DATETIME_DEFAULTS,
+      timeZone: tzRes.iana,
+    }).format(d);
   }
-  return new Intl.DateTimeFormat(undefined, {
-    ...options,
-    timeZone: tzRes.iana,
-  }).format(d);
 }
 
 type WallParts = ReturnType<typeof readZonedWallClockParts>;
