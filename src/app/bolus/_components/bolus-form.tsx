@@ -455,12 +455,12 @@ export function BolusForm({
             .
           </p>
           <p className="mt-1 tabular-nums text-white/80">
-            УК (г на 1 ед.):{" "}
+            Г углеводов на 1 ед.:{" "}
             {resolvedForActiveTime.carbRatio != null ?
               resolvedForActiveTime.carbRatio
             : "—"}
             {insulinPerXeLine ? ` · ~1 ХЕ (12 г): ${insulinPerXeLine} ед.` : ""}
-            {" · "}Фактор коррекции (на 1 ед.):{" "}
+            {" · "}Падение сахара на 1 ед.:{" "}
             {resolvedForActiveTime.insulinSensitivity != null ?
               resolvedForActiveTime.insulinSensitivity
             : "—"}

@@ -115,15 +115,12 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
             подсветки и статистики на экране глюкозы.
           </p>
           <p>
-            <span className="text-white/65">
-              Одна цель для расчёта коррекции
-            </span>{" "}
-            (помощник болюса, подсказки) в приложении не задаётся отдельным
-            полем: берётся{" "}
-            <span className="text-white/65">середина диапазона</span> — (мин + макс) ÷
-            2, в тех же единицах, что замеры. Настройте границы так, чтобы эта
-            середина совпадала с целевой глюкозой для коррекции из вашего плана
-            лечения.
+            <span className="text-white/65">Целевой сахар для коррекции</span>{" "}
+            (доп. инсулин при высоком сахаре) —{" "}
+            <span className="text-white/65">середина</span> между минимумом и
+            максимумом: (мин + макс) ÷ 2, в тех же единицах, что глюкометр.
+            Отдельного поля нет — подберите мин/макс так, чтобы середина была
+            как у вас в плане лечения.
           </p>
           {savedCorrectionTargetLabel ? (
             <p className="text-white/40">
@@ -166,58 +163,58 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
       </section>
 
       <section className={SURFACE_CARD}>
-        <h2 className="text-base font-medium text-white">
-          Расчёт болюса: углеводы и коррекция
-        </h2>
-        <div className="mt-2 space-y-2 text-xs leading-relaxed text-white/50">
+        <h2 className="text-base font-medium text-white">Болюс: еда и коррекция</h2>
+        <div className="mt-2 text-xs leading-relaxed text-white/50">
           <p>
-            Здесь задаётся{" "}
+            Два числа для расчётов:{" "}
+            <span className="text-white/65">сколько г углеводов на 1 ед.</span>{" "}
+            на еду и{" "}
             <span className="text-white/65">
-              инсулин-углеводное соотношение (УК)
+              насколько падает сахар от 1 ед.
             </span>{" "}
-            — сколько граммов углеводов «покрывает» одна единица
-            инсулина при еде — и{" "}
-            <span className="text-white/65">фактор коррекции</span>: на сколько
-            меняется глюкоза (в тех же единицах, что замеры) при введении{" "}
-            <span className="tabular-nums">1</span> ед. инсулина, когда нужно
-            снизить высокий сахар. В протоколах это часто называют
-            чувствительностью к инсулину или ISF — в формуле приложения
-            «лишняя» глюкоза делится именно на это число.
-          </p>
-          <p>
-            Блок времени суток для подстановки УК и фактора коррекции
-            определяется по{" "}
-            <span className="text-white/65">часовому поясу</span> (ниже) и
-            времени расчёта.
+            при коррекции. Утро/день/вечер подставляются по часовому поясу
+            (ниже) и времени расчёта.
           </p>
         </div>
         <div className="mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-3">
-          <p className="text-xs font-medium uppercase tracking-wide text-emerald-100/90">
-            Базовые УК и фактор коррекции (заполните оба)
+          <p className="text-xs font-medium text-emerald-100/90">
+            Основные значения — на весь день, если не уточните ниже
           </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className="block text-sm text-white/70">
-              УК: г углеводов на 1 ед. инсулина (на еду)
+              <span className="block leading-snug">
+                Сколько углеводов покрывает 1 ед. инсулина
+              </span>
+              <span className="mt-0.5 block text-[0.72rem] font-normal text-emerald-100/75">
+                г на 1 ед. Например: «1 ед. на 10 г» — введите{" "}
+                <span className="tabular-nums">10</span>
+              </span>
               <input
                 name="carb_ratio"
                 type="number"
                 inputMode="decimal"
                 step="0.1"
                 disabled={isPending}
-                placeholder="например, 12"
+                placeholder="10"
                 defaultValue={carbStr}
                 className={inputClass}
               />
             </label>
             <label className="block text-sm text-white/70">
-              Фактор коррекции: сдвиг глюкозы на 1 ед. инсулина
+              <span className="block leading-snug">
+                Насколько снижает сахар 1 ед. инсулина
+              </span>
+              <span className="mt-0.5 block text-[0.72rem] font-normal text-emerald-100/75">
+                Те же единицы, что глюкометр. Пример:{" "}
+                <span className="tabular-nums">2</span>
+              </span>
               <input
                 name="insulin_sensitivity"
                 type="number"
                 inputMode="decimal"
                 step="0.1"
                 disabled={isPending}
-                placeholder="например, 2"
+                placeholder="2"
                 defaultValue={isensStr}
                 className={inputClass}
               />
@@ -225,13 +222,12 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
           </div>
           {insulinPerXeHint ? (
             <p className="mt-2 text-xs leading-relaxed text-emerald-100/85">
-              Ориентир 1 ХЕ ≈ 12 г углеводов: ~{insulinPerXeHint} ед. на 1 ХЕ при
-              этом УК.
+              Ориентир: 1 ХЕ ≈ 12 г углеводов — ~{insulinPerXeHint} ед. на 1 ХЕ
+              при этом соотношении.
             </p>
           ) : null}
           <p className="mt-2 text-xs leading-relaxed text-emerald-100/80">
-            Если для интервала суток ниже что-то не заполнено, подставляется
-            соответствующее базовое значение отсюда.
+            В блоке по времени суток пустое поле значит «взять отсюда».
           </p>
         </div>
 
@@ -254,22 +250,20 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
         </p>
 
         <details className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-          <summary className="cursor-pointer list-none text-xs font-medium uppercase tracking-wide text-white/55 [&::-webkit-details-marker]:hidden">
-            Другой УК или фактор коррекции по времени суток (необязательно){" "}
+          <summary className="cursor-pointer list-none text-xs font-medium text-white/60 [&::-webkit-details-marker]:hidden">
+            Другие цифры утром, днём, вечером или ночью (необязательно){" "}
             <span className="font-normal text-white/35">▼</span>
           </summary>
           <p className="mt-2 text-xs leading-relaxed text-white/45">
-            Заполняйте только если коэффициенты действительно отличаются. Пустое
-            поле в блоке — значит «как в базовых» выше.
+            Если по времени суток цифры другие, заполните блок. Пусто — как в
+            основных значениях выше.
           </p>
           <div className="mt-3 space-y-3">
             <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-white/55">
-                Утро · 06:00-11:59
-              </p>
+              <p className="text-xs font-medium text-white/70">Утром · 06:00–11:59</p>
               <div className="mt-2 grid gap-3 sm:grid-cols-2">
                 <label className="block text-sm text-white/70">
-                  УК, г / 1 ед.
+                  Г углеводов на 1 ед.
                   <input
                     name="carb_ratio_morning"
                     type="number"
@@ -281,7 +275,7 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
                   />
                 </label>
                 <label className="block text-sm text-white/70">
-                  Фактор коррекции (на 1 ед.)
+                  Падение сахара на 1 ед.
                   <input
                     name="insulin_sensitivity_morning"
                     type="number"
@@ -296,12 +290,10 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-white/55">
-                День · 12:00-17:59
-              </p>
+              <p className="text-xs font-medium text-white/70">Днём · 12:00–17:59</p>
               <div className="mt-2 grid gap-3 sm:grid-cols-2">
                 <label className="block text-sm text-white/70">
-                  УК, г / 1 ед.
+                  Г углеводов на 1 ед.
                   <input
                     name="carb_ratio_day"
                     type="number"
@@ -313,7 +305,7 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
                   />
                 </label>
                 <label className="block text-sm text-white/70">
-                  Фактор коррекции (на 1 ед.)
+                  Падение сахара на 1 ед.
                   <input
                     name="insulin_sensitivity_day"
                     type="number"
@@ -328,12 +320,12 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-white/55">
-                Вечер · 18:00-23:59
+              <p className="text-xs font-medium text-white/70">
+                Вечером · 18:00–23:59
               </p>
               <div className="mt-2 grid gap-3 sm:grid-cols-2">
                 <label className="block text-sm text-white/70">
-                  УК, г / 1 ед.
+                  Г углеводов на 1 ед.
                   <input
                     name="carb_ratio_evening"
                     type="number"
@@ -345,7 +337,7 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
                   />
                 </label>
                 <label className="block text-sm text-white/70">
-                  Фактор коррекции (на 1 ед.)
+                  Падение сахара на 1 ед.
                   <input
                     name="insulin_sensitivity_evening"
                     type="number"
@@ -360,12 +352,10 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-white/55">
-                Ночь · 00:00-05:59
-              </p>
+              <p className="text-xs font-medium text-white/70">Ночью · 00:00–05:59</p>
               <div className="mt-2 grid gap-3 sm:grid-cols-2">
                 <label className="block text-sm text-white/70">
-                  УК, г / 1 ед.
+                  Г углеводов на 1 ед.
                   <input
                     name="carb_ratio_night"
                     type="number"
@@ -377,7 +367,7 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
                   />
                 </label>
                 <label className="block text-sm text-white/70">
-                  Фактор коррекции (на 1 ед.)
+                  Падение сахара на 1 ед.
                   <input
                     name="insulin_sensitivity_night"
                     type="number"

@@ -113,7 +113,7 @@ export function parseUserSettingsForm(formData: FormData): ParseSettingsFormResu
 
   const carbP = parseOptionalPositiveFloat(
     formData.get("carb_ratio"),
-    "УК (г на 1 ед.)"
+    "Г углеводов на 1 ед. (основное)"
   );
   if (!carbP.ok) {
     return { ok: false, message: carbP.message };
@@ -121,7 +121,7 @@ export function parseUserSettingsForm(formData: FormData): ParseSettingsFormResu
 
   const isensP = parseOptionalPositiveFloat(
     formData.get("insulin_sensitivity"),
-    "Фактор коррекции (сдвиг глюкозы на 1 ед.)"
+    "Падение сахара на 1 ед. (основное)"
   );
   if (!isensP.ok) {
     return { ok: false, message: isensP.message };
@@ -129,56 +129,56 @@ export function parseUserSettingsForm(formData: FormData): ParseSettingsFormResu
 
   const carbMorningP = parseOptionalPositiveFloat(
     formData.get("carb_ratio_morning"),
-    "УК: утро"
+    "Утром: г на 1 ед."
   );
   if (!carbMorningP.ok) {
     return { ok: false, message: carbMorningP.message };
   }
   const carbDayP = parseOptionalPositiveFloat(
     formData.get("carb_ratio_day"),
-    "УК: день"
+    "Днём: г на 1 ед."
   );
   if (!carbDayP.ok) {
     return { ok: false, message: carbDayP.message };
   }
   const carbEveningP = parseOptionalPositiveFloat(
     formData.get("carb_ratio_evening"),
-    "УК: вечер"
+    "Вечером: г на 1 ед."
   );
   if (!carbEveningP.ok) {
     return { ok: false, message: carbEveningP.message };
   }
   const carbNightP = parseOptionalPositiveFloat(
     formData.get("carb_ratio_night"),
-    "УК: ночь"
+    "Ночью: г на 1 ед."
   );
   if (!carbNightP.ok) {
     return { ok: false, message: carbNightP.message };
   }
   const isensMorningP = parseOptionalPositiveFloat(
     formData.get("insulin_sensitivity_morning"),
-    "Фактор коррекции: утро"
+    "Утром: падение на 1 ед."
   );
   if (!isensMorningP.ok) {
     return { ok: false, message: isensMorningP.message };
   }
   const isensDayP = parseOptionalPositiveFloat(
     formData.get("insulin_sensitivity_day"),
-    "Фактор коррекции: день"
+    "Днём: падение на 1 ед."
   );
   if (!isensDayP.ok) {
     return { ok: false, message: isensDayP.message };
   }
   const isensEveningP = parseOptionalPositiveFloat(
     formData.get("insulin_sensitivity_evening"),
-    "Фактор коррекции: вечер"
+    "Вечером: падение на 1 ед."
   );
   if (!isensEveningP.ok) {
     return { ok: false, message: isensEveningP.message };
   }
   const isensNightP = parseOptionalPositiveFloat(
     formData.get("insulin_sensitivity_night"),
-    "Фактор коррекции: ночь"
+    "Ночью: падение на 1 ед."
   );
   if (!isensNightP.ok) {
     return { ok: false, message: isensNightP.message };

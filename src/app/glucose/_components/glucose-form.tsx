@@ -141,7 +141,7 @@ export function GlucoseForm({ formKey, settings }: GlucoseFormProps) {
           </p>
           {!hasSensitivity ? (
             <p className="mt-1 text-white/70">
-              Не задан фактор коррекции (сдвиг глюкозы на 1 ед.) — откройте{" "}
+              Не задано «падение сахара на 1 ед.» — откройте{" "}
               <Link
                 href="/settings"
                 className="underline decoration-white/30 underline-offset-2"

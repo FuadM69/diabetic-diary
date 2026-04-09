@@ -37,7 +37,7 @@ export function bolusSettingsReady(settings: UserSettings): boolean {
 }
 
 export function bolusSettingsMissingMessage(): string {
-  return "В настройках укажите УК (г углеводов на 1 ед.) и фактор коррекции (сдвиг глюкозы на 1 ед.) — без них оценка недоступна.";
+  return "В настройках укажите: сколько г углеводов на 1 ед. инсулина и насколько падает сахар от 1 ед. — без них оценка недоступна.";
 }
 
 function isPositiveNumber(v: number | null | undefined): v is number {
