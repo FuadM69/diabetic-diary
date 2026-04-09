@@ -5,7 +5,7 @@ import { getInsulinEntries } from "@/lib/db/insulin";
 import { getMealEntries, getSelectableFoodProducts } from "@/lib/db/meals";
 import { getUserSettings } from "@/lib/db/settings";
 import { extractLinkedMealIdFromInsulinNote } from "@/lib/utils/bolus-prefill";
-import { formatDatetimeLocalValue } from "@/lib/utils/datetime-local";
+import { defaultDatetimeLocalForUserSettings } from "@/lib/utils/datetime-local-tz";
 import { MealForm } from "./_components/meal-form";
 import { MealList } from "./_components/meal-list";
 import { SECTION_TITLE, SURFACE_CARD } from "@/lib/ui/page-patterns";
@@ -37,7 +37,7 @@ export default async function MealsPage() {
 
   /** Stable across new rows in the journal so the create form keeps success UI after save. */
   const createFormKey = `meal-create|${products.length}`;
-  const defaultEatenAt = formatDatetimeLocalValue(new Date());
+  const eatenAtDefault = defaultDatetimeLocalForUserSettings(settings.timezone);
 
   return (
     <AppShell title="Еда">
@@ -57,7 +57,11 @@ export default async function MealsPage() {
           <MealForm
             products={products}
             formKey={createFormKey}
-            defaultEatenAt={defaultEatenAt}
+            defaultEatenAt={eatenAtDefault.ok ? eatenAtDefault.value : ""}
+            timezoneConfigError={
+              eatenAtDefault.ok ? null : eatenAtDefault.message
+            }
+            savedUserTimezone={settings.timezone}
           />
         </section>
 

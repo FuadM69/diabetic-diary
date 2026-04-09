@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import type { FoodProduct } from "@/lib/types/food";
 import {
   getDisplayProductName,
@@ -8,6 +8,8 @@ import {
 } from "@/lib/utils/food-product-kind";
 
 type Row = { id: string };
+
+type RowFieldValues = { productId: string; grams: string };
 
 function newRowId(): string {
   return `row-${Math.random().toString(36).slice(2, 10)}`;
@@ -60,6 +62,9 @@ const selectClass =
 const inputClass =
   "mt-1 w-full rounded-2xl border border-white/10 bg-black/40 px-3 py-2.5 text-base text-white outline-none focus:border-white/30 disabled:opacity-60";
 
+/** Cap autocomplete height and items for mobile performance. */
+const AUTOCOMPLETE_MAX_ITEMS = 24;
+
 type ProductScope = "all" | "food" | "drink";
 
 export type MealItemEditorInitialRow = {
@@ -68,6 +73,19 @@ export type MealItemEditorInitialRow = {
   foodProductId: string;
   grams: string;
 };
+
+function buildInitialRowValues(
+  initialItems: MealItemEditorInitialRow[] | undefined
+): Record<string, RowFieldValues> {
+  if (!initialItems?.length) {
+    return {};
+  }
+  const m: Record<string, RowFieldValues> = {};
+  for (const it of initialItems) {
+    m[it.key] = { productId: it.foodProductId, grams: it.grams };
+  }
+  return m;
+}
 
 type MealItemsEditorProps = {
   products: FoodProduct[];
@@ -82,7 +100,6 @@ export function MealItemsEditor({
   initialItems,
 }: MealItemsEditorProps) {
   const baseId = useId();
-  const selectRefs = useRef<Record<string, HTMLSelectElement | null>>({});
   const [activeRowId, setActiveRowId] = useState<string | null>(null);
   const [rows, setRows] = useState<Row[]>(() => {
     if (initialItems && initialItems.length > 0) {
@@ -90,6 +107,10 @@ export function MealItemsEditor({
     }
     return [{ id: newRowId() }];
   });
+
+  const [rowFields, setRowFields] = useState<Record<string, RowFieldValues>>(
+    () => buildInitialRowValues(initialItems)
+  );
 
   const [productQuery, setProductQuery] = useState("");
   const [scope, setScope] = useState<ProductScope>("all");
@@ -109,15 +130,24 @@ export function MealItemsEditor({
     [scopedProducts, productQuery]
   );
 
+  const searchTrimmed = productQuery.trim();
   const showNoResults =
-    products.length > 0 &&
-    filteredProducts.length === 0 &&
-    productQuery.trim() !== "";
+    products.length > 0 && filteredProducts.length === 0 && searchTrimmed !== "";
 
-  const suggestionProducts = useMemo(
-    () => filteredProducts.slice(0, 8),
-    [filteredProducts]
-  );
+  const autocompleteCandidates = useMemo(() => {
+    if (searchTrimmed === "") {
+      return [];
+    }
+    return filteredProducts.slice(0, AUTOCOMPLETE_MAX_ITEMS);
+  }, [filteredProducts, searchTrimmed]);
+
+  const activeRowNumber = useMemo(() => {
+    if (!activeRowId) {
+      return 1;
+    }
+    const i = rows.findIndex((r) => r.id === activeRowId);
+    return i >= 0 ? i + 1 : 1;
+  }, [rows, activeRowId]);
 
   useEffect(() => {
     if (rows.length === 0) {
@@ -129,39 +159,37 @@ export function MealItemsEditor({
     }
   }, [rows, activeRowId]);
 
-  const rowDefaults =
-    initialItems && initialItems.length > 0 ?
-      new Map(initialItems.map((it) => [it.key, it]))
-    : null;
-
   const addRow = () => {
-    setRows((prev) => {
-      const next = [...prev, { id: newRowId() }];
-      setActiveRowId(next[next.length - 1]!.id);
+    const id = newRowId();
+    setRows((prev) => [...prev, { id }]);
+    setActiveRowId(id);
+  };
+
+  const removeRow = (id: string) => {
+    if (rows.length <= 1) {
+      return;
+    }
+    setRows((prev) => prev.filter((r) => r.id !== id));
+    setRowFields((prev) => {
+      const next = { ...prev };
+      delete next[id];
       return next;
     });
   };
 
-  const removeRow = (id: string) => {
-    setRows((prev) => {
-      if (prev.length <= 1) {
-        return prev;
-      }
-      return prev.filter((r) => r.id !== id);
-    });
-  };
-
-  const applySuggestionToActiveRow = (p: FoodProduct) => {
+  const pickProductForActiveRow = (p: FoodProduct) => {
     const rowId = activeRowId ?? rows[0]?.id ?? null;
     if (!rowId) {
       return;
     }
-    const el = selectRefs.current[rowId];
-    if (!el) {
-      return;
-    }
-    el.value = p.id;
-    el.dispatchEvent(new Event("change", { bubbles: true }));
+    setRowFields((prev) => ({
+      ...prev,
+      [rowId]: {
+        productId: p.id,
+        grams: prev[rowId]?.grams ?? "",
+      },
+    }));
+    setProductQuery("");
   };
 
   return (
@@ -169,10 +197,17 @@ export function MealItemsEditor({
       <p className="text-sm font-medium text-white/80">Состав</p>
 
       <div className="rounded-2xl border border-white/20 bg-white/[0.06] p-3 shadow-sm shadow-black/20">
-        <p className="text-xs font-medium text-white/80">
-          Поиск в каталоге
+        <p className="text-xs font-medium text-white/80">Поиск продукта</p>
+        <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.7rem] leading-snug text-white/55">
+          <span className="inline-flex shrink-0 rounded-full border border-emerald-400/35 bg-emerald-500/15 px-2 py-0.5 font-medium tabular-nums text-emerald-100/95">
+            Строка {activeRowNumber}
+          </span>
+          <span>
+            Выбор из списка ниже подставит продукт сюда. Другая строка — нажмите
+            на неё или на поле веса.
+          </span>
         </p>
-        <div className="mt-1.5 flex flex-wrap gap-2">
+        <div className="mt-2 flex flex-wrap gap-2">
           <button
             type="button"
             disabled={disabled}
@@ -221,83 +256,104 @@ export function MealItemsEditor({
             className={inputClass}
             placeholder="Название или бренд…"
             aria-label="Поиск продукта по названию или бренду"
+            aria-controls={`${baseId}-autocomplete`}
+            aria-expanded={autocompleteCandidates.length > 0}
           />
         </label>
-        {suggestionProducts.length > 0 ? (
-          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-black/25 px-2 py-1.5">
-            <span className="min-w-0 flex-1 truncate text-[0.7rem] text-white/80">
-              <span className="text-white/45">Совпадение:</span>{" "}
-              <span className="font-medium text-white/90">
-                {getDisplayProductName(suggestionProducts[0].name)}
-                {suggestionProducts[0].brand ?
-                  ` · ${suggestionProducts[0].brand}`
-                : ""}
-              </span>
-            </span>
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={() => applySuggestionToActiveRow(suggestionProducts[0])}
-              className="shrink-0 rounded-lg border border-white/20 bg-white/[0.08] px-2 py-1 text-[0.65rem] font-medium text-white/90 hover:bg-white/[0.14] disabled:opacity-50"
-            >
-              В строку
-            </button>
-            {suggestionProducts.length > 1 ? (
-              <details className="shrink-0 [&_summary::-webkit-details-marker]:hidden">
-                <summary className="cursor-pointer list-none rounded-lg border border-white/15 bg-white/[0.05] px-2 py-1 text-[0.65rem] text-white/55">
-                  +{suggestionProducts.length - 1}
-                </summary>
-                <div className="mt-1.5 flex max-h-28 flex-wrap gap-1 overflow-y-auto pr-0.5">
-                  {suggestionProducts.slice(1).map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      disabled={disabled}
-                      onClick={() => applySuggestionToActiveRow(p)}
-                      className="max-w-full truncate rounded-full border border-white/12 bg-white/[0.06] px-2 py-0.5 text-left text-[0.65rem] text-white/80 hover:bg-white/[0.1] disabled:opacity-50"
-                    >
+        {autocompleteCandidates.length > 0 ? (
+          <ul
+            id={`${baseId}-autocomplete`}
+            role="listbox"
+            aria-label="Совпадения поиска"
+            className="mt-2 max-h-52 overflow-y-auto overscroll-y-contain rounded-xl border border-white/12 bg-black/35 py-1"
+          >
+            {autocompleteCandidates.map((p) => (
+              <li key={p.id} role="none">
+                <button
+                  type="button"
+                  role="option"
+                  disabled={disabled}
+                  onClick={() => pickProductForActiveRow(p)}
+                  className="flex w-full min-w-0 items-start gap-2 border-b border-white/[0.06] px-3 py-2.5 text-left text-sm text-white/90 last:border-b-0 hover:bg-white/[0.08] disabled:opacity-50 active:bg-white/[0.1]"
+                >
+                  <span className="min-w-0 flex-1 leading-snug">
+                    <span className="font-medium text-white">
                       {getDisplayProductName(p.name)}
-                      {p.brand ? ` · ${p.brand}` : ""}
-                    </button>
-                  ))}
-                </div>
-              </details>
+                    </span>
+                    {isDrinkProduct(p) ? (
+                      <span className="text-white/45"> · Напиток</span>
+                    ) : null}
+                    {p.brand ?
+                      <span className="block text-[0.72rem] text-white/50">
+                        {p.brand}
+                      </span>
+                    : null}
+                  </span>
+                </button>
+              </li>
+            ))}
+            {filteredProducts.length > AUTOCOMPLETE_MAX_ITEMS ? (
+              <li className="px-3 py-2 text-[0.65rem] text-white/40">
+                Показаны первые {AUTOCOMPLETE_MAX_ITEMS} совпадений — уточните
+                запрос или выберите в списке в строке.
+              </li>
             ) : null}
-          </div>
+          </ul>
+        ) : null}
+        {showNoResults ? (
+          <p className="mt-2 text-sm text-white/50" role="status">
+            Ничего не найдено
+          </p>
+        ) : null}
+        {searchTrimmed === "" && products.length > 0 ? (
+          <p className="mt-1.5 text-[0.7rem] text-white/40">
+            Начните ввод — список для выбора появится здесь.
+          </p>
         ) : null}
       </div>
 
-      {showNoResults ? (
-        <p className="text-sm text-white/50" role="status">
-          Ничего не найдено
-        </p>
-      ) : null}
-
       <ul className="space-y-3">
         {rows.map((row, index) => {
-          const preset = rowDefaults?.get(row.id);
+          const fields = rowFields[row.id] ?? {
+            productId: "",
+            grams: "",
+          };
+          const selectedId =
+            fields.productId.trim() !== "" ? fields.productId : undefined;
           const rowOptions = optionsForRow(
             filteredProducts,
             products,
-            preset?.foodProductId
+            selectedId
           );
+          const isActiveRow = activeRowId === row.id;
           return (
             <li
               key={row.id}
-              className="rounded-2xl border border-white/10 bg-black/25 p-3"
+              className={`rounded-2xl border bg-black/25 p-3 ${
+                isActiveRow
+                  ? "border-emerald-400/35 ring-1 ring-emerald-400/25"
+                  : "border-white/10"
+              }`}
             >
               <div className="flex items-start gap-2">
                 <div className="min-w-0 flex-1 space-y-2">
                   <label className="block text-xs text-white/55">
                     Продукт #{index + 1}
                     <select
-                      ref={(el) => {
-                        selectRefs.current[row.id] = el;
-                      }}
                       name="food_product_id"
                       disabled={disabled}
-                      defaultValue={preset?.foodProductId ?? ""}
+                      value={fields.productId}
                       onFocus={() => setActiveRowId(row.id)}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setRowFields((prev) => ({
+                          ...prev,
+                          [row.id]: {
+                            productId: v,
+                            grams: prev[row.id]?.grams ?? "",
+                          },
+                        }));
+                      }}
                       className={selectClass}
                     >
                       <option value="">
@@ -324,7 +380,18 @@ export function MealItemsEditor({
                       step="0.1"
                       placeholder="например, 150"
                       disabled={disabled}
-                      defaultValue={preset?.grams ?? ""}
+                      value={fields.grams}
+                      onFocus={() => setActiveRowId(row.id)}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setRowFields((prev) => ({
+                          ...prev,
+                          [row.id]: {
+                            productId: prev[row.id]?.productId ?? "",
+                            grams: v,
+                          },
+                        }));
+                      }}
                       className={inputClass}
                     />
                   </label>

@@ -7,6 +7,7 @@ import type { FoodProduct } from "@/lib/types/food";
 import { MEAL_TYPE_KEYS, MEAL_TYPE_LABEL_RU } from "@/lib/types/meal";
 import { createMealEntryAction, type MealActionResult } from "../actions";
 import { FEEDBACK_ERROR } from "@/lib/ui/page-patterns";
+import { getInsulinTakenAtTimezoneCaption } from "@/lib/utils/insulin";
 import {
   MealItemsEditor,
   type MealItemEditorInitialRow,
@@ -26,12 +27,12 @@ const bolusLinkClass =
 const journalLinkClass =
   "inline-flex w-full items-center justify-center rounded-2xl border border-white/20 px-4 py-3 text-center text-sm font-medium text-white/90 transition-colors hover:bg-white/5 sm:w-auto";
 
-function SubmitButton() {
+function SubmitButton({ formDisabled = false }: { formDisabled?: boolean }) {
   const { pending } = useFormStatus();
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={pending || formDisabled}
       className="w-full rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black disabled:cursor-not-allowed disabled:opacity-65"
     >
       {pending ? "Сохранение…" : "Сохранить приём пищи"}
@@ -42,8 +43,12 @@ function SubmitButton() {
 type MealFormProps = {
   products: FoodProduct[];
   formKey: string;
-  /** From server render to avoid client `new Date()` hydration drift. */
+  /** From server: wall time in `user_settings.timezone`, same as on submit. */
   defaultEatenAt: string;
+  /** Invalid/missing timezone in profile — avoid misleading default time. */
+  timezoneConfigError?: string | null;
+  /** Raw `user_settings.timezone` for caption under datetime-local. */
+  savedUserTimezone?: string | null;
 };
 
 type MealDraftItem = {
@@ -115,8 +120,15 @@ function clearMealDraft(): void {
   }
 }
 
-export function MealForm({ products, formKey, defaultEatenAt }: MealFormProps) {
+export function MealForm({
+  products,
+  formKey,
+  defaultEatenAt,
+  timezoneConfigError = null,
+  savedUserTimezone = null,
+}: MealFormProps) {
   const fieldIds = useId();
+  const eatenAtTzCaption = getInsulinTakenAtTimezoneCaption(savedUserTimezone);
   const formRef = useRef<HTMLFormElement>(null);
   const eatenId = `${fieldIds}-eaten`;
   const mealTypeId = `${fieldIds}-meal-type`;
@@ -205,6 +217,8 @@ export function MealForm({ products, formKey, defaultEatenAt }: MealFormProps) {
     });
   };
 
+  const blockSubmit = Boolean(timezoneConfigError);
+
   return (
     <form
       key={formKey}
@@ -222,12 +236,20 @@ export function MealForm({ products, formKey, defaultEatenAt }: MealFormProps) {
           id={eatenId}
           name="eaten_at"
           type="datetime-local"
-          required
+          required={!blockSubmit}
           value={eatenAt}
           onChange={(e) => setEatenAt(e.target.value)}
-          disabled={isPending}
-          className={`${fieldClass} min-w-0 w-full [color-scheme:dark]`}
+          disabled={isPending || blockSubmit}
+          className={`${fieldClass} min-w-0 w-full max-w-full [color-scheme:dark]`}
         />
+        <p className="text-[0.7rem] leading-snug text-white/45">
+          {eatenAtTzCaption}
+        </p>
+        {timezoneConfigError ? (
+          <p role="alert" className="text-xs leading-snug text-amber-200/90">
+            {timezoneConfigError}
+          </p>
+        ) : null}
       </div>
 
       <div className="space-y-2">
@@ -238,7 +260,7 @@ export function MealForm({ products, formKey, defaultEatenAt }: MealFormProps) {
           id={mealTypeId}
           name="meal_type"
           required
-          disabled={isPending}
+          disabled={isPending || blockSubmit}
           value={mealType}
           onChange={(e) => setMealType(e.target.value)}
           className={fieldClass}
@@ -259,7 +281,7 @@ export function MealForm({ products, formKey, defaultEatenAt }: MealFormProps) {
           id={noteId}
           name="note"
           rows={2}
-          disabled={isPending}
+          disabled={isPending || blockSubmit}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="Необязательно"
@@ -269,7 +291,7 @@ export function MealForm({ products, formKey, defaultEatenAt }: MealFormProps) {
 
       <MealItemsEditor
         products={products}
-        disabled={isPending || !draftLoaded}
+        disabled={isPending || !draftLoaded || blockSubmit}
         initialItems={initialItems}
       />
 
@@ -304,7 +326,7 @@ export function MealForm({ products, formKey, defaultEatenAt }: MealFormProps) {
         </div>
       ) : null}
 
-      <SubmitButton />
+      <SubmitButton formDisabled={blockSubmit} />
 
       <details className="rounded-2xl border border-white/10 bg-white/[0.02] px-3 py-2 sm:px-3.5">
         <summary className="cursor-pointer list-none text-xs text-white/50 [&::-webkit-details-marker]:hidden">
