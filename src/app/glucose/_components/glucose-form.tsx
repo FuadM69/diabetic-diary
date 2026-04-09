@@ -1,13 +1,21 @@
 "use client";
 
-import { useActionState } from "react";
+import Link from "next/link";
+import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
+import type { UserSettings } from "@/lib/types/glucose";
+import { formatBolusDose } from "@/lib/utils/bolus";
+import {
+  bolusTargetGlucoseFromRange,
+  computeCorrectionBolus,
+} from "@/lib/utils/bolus";
 import {
   submitGlucoseEntry,
   type GlucoseSubmitResult,
 } from "../actions";
 import { FEEDBACK_ERROR, FEEDBACK_SUCCESS } from "@/lib/ui/page-patterns";
 import { formatDatetimeLocalValue } from "@/lib/utils/datetime-local";
+import { roundInsulinPrefillUnits } from "@/lib/utils/insulin-form";
 
 const initialState: GlucoseSubmitResult = {
   success: false,
@@ -20,6 +28,7 @@ function SubmitButton() {
   return (
     <button
       type="submit"
+      disabled={pending}
       aria-busy={pending}
       className="rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black disabled:cursor-not-allowed disabled:opacity-70"
     >
@@ -31,20 +40,56 @@ function SubmitButton() {
 type GlucoseFormProps = {
   /** Bumps when server data changes after save so fields reset without useEffect. */
   formKey: string;
+  settings: UserSettings;
 };
 
-export function GlucoseForm({ formKey }: GlucoseFormProps) {
+export function GlucoseForm({ formKey, settings }: GlucoseFormProps) {
   const [state, formAction, isPending] = useActionState(
     async (_prev: GlucoseSubmitResult, formData: FormData) =>
       submitGlucoseEntry(formData),
     initialState
   );
+  const [glucoseInput, setGlucoseInput] = useState("");
 
   /** Fresh “now” whenever the parent re-renders; the `<form key={formKey}>` remount applies it after save. */
   const defaultMeasuredAt = formatDatetimeLocalValue(new Date());
 
   const showValidationOrGeneralError = state.error !== null;
   const showSuccess = state.success && !state.error;
+  const currentGlucose = Number.parseFloat(glucoseInput.replace(",", "."));
+  const hasGlucoseForSuggestion =
+    glucoseInput.trim().length > 0 &&
+    Number.isFinite(currentGlucose) &&
+    currentGlucose > 0;
+  const hasSensitivity =
+    typeof settings.insulin_sensitivity === "number" &&
+    Number.isFinite(settings.insulin_sensitivity) &&
+    settings.insulin_sensitivity > 0;
+  const targetGlucose = bolusTargetGlucoseFromRange(
+    settings.glucose_target_min,
+    settings.glucose_target_max
+  );
+  const correctionUnits =
+    hasGlucoseForSuggestion && hasSensitivity
+      ? computeCorrectionBolus(
+          currentGlucose,
+          targetGlucose,
+          settings.insulin_sensitivity!
+        )
+      : 0;
+  const correctionPrefillHref =
+    correctionUnits > 0
+      ? `/insulin?${new URLSearchParams({
+          units: String(roundInsulinPrefillUnits(correctionUnits)),
+          entry_type: "correction",
+        }).toString()}#insulin-add`
+      : null;
+
+  useEffect(() => {
+    if (state.success) {
+      setGlucoseInput("");
+    }
+  }, [state.success]);
 
   return (
     <form key={formKey} action={formAction} className="space-y-4">
@@ -64,14 +109,65 @@ export function GlucoseForm({ formKey }: GlucoseFormProps) {
           step="0.1"
           inputMode="decimal"
           placeholder="Например, 6.2"
+          value={glucoseInput}
+          onChange={(e) => setGlucoseInput(e.target.value)}
           disabled={isPending}
           aria-invalid={showValidationOrGeneralError}
           aria-describedby={
             showValidationOrGeneralError ? "glucose-form-error" : undefined
           }
-          className="mt-2 w-full max-w-xs rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none placeholder:text-white/40 focus:border-white/30 disabled:opacity-60 aria-invalid:border-red-400/50"
+          className="mt-2 w-full max-w-xs rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-base text-white outline-none placeholder:text-white/40 focus:border-white/30 disabled:opacity-60 aria-invalid:border-red-400/50"
         />
       </div>
+
+      {hasGlucoseForSuggestion ? (
+        <div
+          className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3 text-sm"
+          role="status"
+        >
+          <p className="text-xs font-medium uppercase tracking-wide text-white/45">
+            Подсказка коррекции
+          </p>
+          {!hasSensitivity ? (
+            <p className="mt-1 text-white/70">
+              Не хватает настройки чувствительности к инсулину — откройте{" "}
+              <Link
+                href="/settings"
+                className="underline decoration-white/30 underline-offset-2"
+              >
+                настройки
+              </Link>
+              .
+            </p>
+          ) : correctionUnits > 0 ? (
+            <>
+              <p className="mt-1 text-white/85">
+                Глюкоза выше целевого диапазона. Оценка коррекции:{" "}
+                <span className="tabular-nums font-semibold text-white">
+                  {formatBolusDose(correctionUnits)} ед.
+                </span>
+              </p>
+              {correctionPrefillHref ? (
+                <Link
+                  href={correctionPrefillHref}
+                  className="mt-2 inline-flex rounded-xl border border-white/20 px-3 py-2 text-xs font-medium text-white/90 hover:bg-white/5"
+                  prefetch={false}
+                >
+                  Открыть форму инсулина с подсказкой
+                </Link>
+              ) : null}
+            </>
+          ) : (
+            <p className="mt-1 text-white/70">
+              Глюкоза в/ниже цели — коррекция не требуется.
+            </p>
+          )}
+          <p className="mt-2 text-[0.7rem] leading-snug text-white/45">
+            Это только ориентир, запись инсулина создаёте вручную.
+          </p>
+        </div>
+      ) : null}
+
       <div>
         <label
           htmlFor="glucose-measured-at"
@@ -89,7 +185,7 @@ export function GlucoseForm({ formKey }: GlucoseFormProps) {
           aria-describedby={
             showValidationOrGeneralError ? "glucose-form-error" : undefined
           }
-          className="mt-2 w-full max-w-xs rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none focus:border-white/30 disabled:opacity-60 aria-invalid:border-red-400/50 [color-scheme:dark]"
+          className="mt-2 w-full max-w-xs rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-base text-white outline-none focus:border-white/30 disabled:opacity-60 aria-invalid:border-red-400/50 [color-scheme:dark]"
         />
       </div>
       <label htmlFor="glucose-note" className="block text-sm text-white/70">
@@ -101,7 +197,7 @@ export function GlucoseForm({ formKey }: GlucoseFormProps) {
           rows={2}
           disabled={isPending}
           placeholder="контекст замера"
-          className="mt-2 w-full resize-none rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none placeholder:text-white/40 focus:border-white/30 disabled:opacity-60"
+          className="mt-2 w-full resize-none rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-base text-white outline-none placeholder:text-white/40 focus:border-white/30 disabled:opacity-60"
         />
       </label>
       <SubmitButton />

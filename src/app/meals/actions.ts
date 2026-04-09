@@ -20,6 +20,8 @@ export type MealActionResult = {
   /** Set only after successful **create** — for deep link to /bolus. */
   createdMealId?: string | null;
   createdTotalCarbs?: number | null;
+  /** UTC ISO `eaten_at` saved for the new meal — for bolus glucose time anchor. */
+  createdMealEatenAtIso?: string | null;
 };
 
 export async function createMealEntryAction(
@@ -65,6 +67,7 @@ export async function createMealEntryAction(
     error: null,
     createdMealId: result.mealId,
     createdTotalCarbs: result.totalCarbs,
+    createdMealEatenAtIso: result.eatenAtIso,
   };
 }
 

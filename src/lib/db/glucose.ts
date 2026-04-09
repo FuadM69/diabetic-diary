@@ -85,6 +85,29 @@ export async function getLatestGlucoseEntry(
   return data ? (data as GlucoseEntry) : null;
 }
 
+/** Latest reading at or before `measuredAtLte` (ISO), by `measured_at` desc. */
+export async function getLatestGlucoseEntryAtOrBefore(
+  userId: string,
+  measuredAtLte: string
+): Promise<GlucoseEntry | null> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("glucose_entries")
+    .select(GLUCOSE_SELECT)
+    .eq("user_id", userId)
+    .lte("measured_at", measuredAtLte)
+    .order("measured_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data ? (data as GlucoseEntry) : null;
+}
+
 export type InsertGlucoseEntryResult =
   | { ok: true; rows: GlucoseEntry[] }
   | { ok: false; errorMessage: string };

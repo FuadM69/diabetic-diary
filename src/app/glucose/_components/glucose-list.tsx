@@ -11,9 +11,15 @@ type GlucoseListProps = {
   entries: GlucoseEntry[];
   settings: UserSettings;
   range: GlucoseRangeKey;
+  userTimezone: string | null;
 };
 
-export function GlucoseList({ entries, settings, range }: GlucoseListProps) {
+export function GlucoseList({
+  entries,
+  settings,
+  range,
+  userTimezone,
+}: GlucoseListProps) {
   if (entries.length === 0) {
     const empty = getGlucoseListEmptyMessage(range);
     const action =
@@ -35,6 +41,7 @@ export function GlucoseList({ entries, settings, range }: GlucoseListProps) {
         <GlucoseCard
           key={entry.id}
           entry={entry}
+          userTimezone={userTimezone}
           status={getGlucoseStatus(
             entry.glucose_value,
             settings.glucose_target_min,

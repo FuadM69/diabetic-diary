@@ -1,5 +1,6 @@
 import type { GlucoseRangeKey } from "@/lib/types/glucose";
 import type { InsulinEntry, InsulinEntryType } from "@/lib/types/insulin";
+import { stripLinkedMealMarkerFromInsulinNote } from "@/lib/utils/bolus-prefill";
 import { formatUtcIsoForUserDisplay } from "@/lib/utils/datetime-local-tz";
 import {
   formatInsulinUnits,
@@ -43,6 +44,7 @@ export function InsulinCard({
     TYPE_PRESENTATION[entry.entry_type] ?? TYPE_PRESENTATION.bolus;
   const typeLabel =
     INSULIN_ENTRY_TYPE_LABEL_RU[entry.entry_type] ?? entry.entry_type;
+  const noteForDisplay = stripLinkedMealMarkerFromInsulinNote(entry.note);
 
   return (
     <li
@@ -67,14 +69,19 @@ export function InsulinCard({
             <p className="truncate text-sm text-white/60">{entry.insulin_name}</p>
           ) : null}
           <p className="text-xs text-white/48">
-            {formatUtcIsoForUserDisplay(entry.taken_at, userTimezone)}
+            {formatUtcIsoForUserDisplay(entry.taken_at, userTimezone, {
+              dateStyle: "medium",
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            })}
           </p>
         </div>
       </div>
 
-      {entry.note ? (
+      {noteForDisplay ? (
         <p className="mt-3 border-t border-white/10 pt-3 text-sm leading-relaxed text-white/65">
-          {entry.note}
+          {noteForDisplay}
         </p>
       ) : null}
 

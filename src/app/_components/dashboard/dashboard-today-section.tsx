@@ -1,20 +1,20 @@
 import Link from "next/link";
 import type { GlucoseEntry, GlucoseStats, UserSettings } from "@/lib/types/glucose";
-import {
-  formatGlucoseDate,
-  formatGlucoseValue,
-} from "@/lib/utils/glucose";
+import { formatUtcIsoForUserDisplay } from "@/lib/utils/datetime-local-tz";
+import { formatGlucoseValue } from "@/lib/utils/glucose";
 
 type DashboardTodaySectionProps = {
   latest: GlucoseEntry;
   todayStats: GlucoseStats;
   settings: UserSettings;
+  userTimezone: string | null;
 };
 
 export function DashboardTodaySection({
   latest,
   todayStats,
   settings,
+  userTimezone,
 }: DashboardTodaySectionProps) {
   const readingsToday = todayStats.isEmpty ? 0 : todayStats.totalCount;
 
@@ -59,7 +59,12 @@ export function DashboardTodaySection({
             {formatGlucoseValue(latest.glucose_value)}
           </p>
           <p className="mt-1 text-xs text-white/50">
-            {formatGlucoseDate(latest.measured_at)}
+            {formatUtcIsoForUserDisplay(latest.measured_at, userTimezone, {
+              dateStyle: "medium",
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            })}
           </p>
         </div>
       </div>

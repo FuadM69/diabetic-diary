@@ -35,7 +35,11 @@ export function BolusResultCard({
       ) : null}
 
       {estimate && !message ? (
-        <dl className="mt-3 text-sm">
+        <>
+          <p className="mt-3 text-xs text-emerald-200/85" role="status">
+            Статус: шаг 1 из 3 — оценка рассчитана.
+          </p>
+          <dl className="mt-2 text-sm">
           <div className={rowClass}>
             <dt className="text-white/55">Цель для коррекции</dt>
             <dd className="tabular-nums font-medium text-white">
@@ -60,7 +64,8 @@ export function BolusResultCard({
               {formatBolusDose(estimate.totalBolus)} ед.
             </dd>
           </div>
-        </dl>
+          </dl>
+        </>
       ) : null}
 
       {estimate && !message && estimate.totalBolus <= 0 ? (
@@ -80,7 +85,7 @@ export function BolusResultCard({
             className="mt-3 flex w-full items-center justify-center rounded-2xl border border-white/20 bg-white/[0.06] px-4 py-3 text-center text-sm font-medium text-white/90 transition-colors hover:border-white/30 hover:bg-white/[0.09]"
             prefetch={false}
           >
-            Записать в журнал инсулина…
+            Шаг 2: перенести в форму инсулина…
           </Link>
           <p className="mt-2 text-center text-[0.65rem] text-white/35">
             Это действие лишь открывает форму с подставленными полями, не

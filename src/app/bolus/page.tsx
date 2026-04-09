@@ -2,10 +2,17 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { getCurrentUser } from "@/lib/auth/getUser";
-import { getLatestGlucoseEntry } from "@/lib/db/glucose";
+import {
+  getLatestGlucoseEntry,
+  getLatestGlucoseEntryAtOrBefore,
+} from "@/lib/db/glucose";
 import { getMealEntryDetails, getRecentMealEntries } from "@/lib/db/meals";
 import { getUserSettings } from "@/lib/db/settings";
-import type { BolusMealContext, BolusRecentMealOption } from "@/lib/types/bolus";
+import type {
+  BolusGlucoseSuggestion,
+  BolusMealContext,
+  BolusRecentMealOption,
+} from "@/lib/types/bolus";
 import type { MealEntryWithItems, MealTypeKey } from "@/lib/types/meal";
 import { MEAL_TYPE_LABEL_RU } from "@/lib/types/meal";
 import {
@@ -22,23 +29,33 @@ type BolusPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-function toRecentMealOptions(
+async function buildRecentMealOptions(
+  userId: string,
   meals: MealEntryWithItems[]
-): BolusRecentMealOption[] {
-  return meals.map((m) => {
-    const totalCarbs = sumCarbsFromItems(m.meal_items);
-    const mealTypeLabel =
-      m.meal_type in MEAL_TYPE_LABEL_RU
-        ? MEAL_TYPE_LABEL_RU[m.meal_type as MealTypeKey]
-        : m.meal_type;
-    return {
-      id: m.id,
-      eatenAt: m.eaten_at,
-      mealType: m.meal_type,
-      mealTypeLabel,
-      totalCarbs,
-    };
-  });
+): Promise<BolusRecentMealOption[]> {
+  return Promise.all(
+    meals.map(async (m) => {
+      const totalCarbs = sumCarbsFromItems(m.meal_items);
+      const mealTypeLabel =
+        m.meal_type in MEAL_TYPE_LABEL_RU
+          ? MEAL_TYPE_LABEL_RU[m.meal_type as MealTypeKey]
+          : m.meal_type;
+      const g = await getLatestGlucoseEntryAtOrBefore(userId, m.eaten_at);
+      const badTime = g && g.measured_at > m.eaten_at;
+      const v = badTime ? undefined : g?.glucose_value;
+      return {
+        id: m.id,
+        eatenAt: m.eaten_at,
+        mealType: m.meal_type,
+        mealTypeLabel,
+        totalCarbs,
+        suggestGlucoseValue:
+          typeof v === "number" && Number.isFinite(v) ? v : null,
+        suggestGlucoseMeasuredAt:
+          !badTime && g ? g.measured_at : null,
+      };
+    })
+  );
 }
 
 async function resolveBolusMealContextFromUrl(
@@ -48,9 +65,14 @@ async function resolveBolusMealContextFromUrl(
 ): Promise<{
   initialMealContext: BolusMealContext | null;
   linkedMealMissing: boolean;
+  linkedMealEatenAtIso: string | null;
 }> {
   if (!linkedMealId) {
-    return { initialMealContext: null, linkedMealMissing: false };
+    return {
+      initialMealContext: null,
+      linkedMealMissing: false,
+      linkedMealEatenAtIso: null,
+    };
   }
 
   const fromRecent = recentMealsRaw.find((m) => m.id === linkedMealId);
@@ -58,7 +80,11 @@ async function resolveBolusMealContextFromUrl(
     fromRecent ?? (await getMealEntryDetails(userId, linkedMealId));
 
   if (!meal) {
-    return { initialMealContext: null, linkedMealMissing: true };
+    return {
+      initialMealContext: null,
+      linkedMealMissing: true,
+      linkedMealEatenAtIso: null,
+    };
   }
 
   const mealTypeLabel =
@@ -75,6 +101,7 @@ async function resolveBolusMealContextFromUrl(
       carbsGrams,
     },
     linkedMealMissing: false,
+    linkedMealEatenAtIso: meal.eaten_at,
   };
 }
 
@@ -88,21 +115,62 @@ export default async function BolusPage({ searchParams }: BolusPageProps) {
   const urlPrefill = parseBolusUrlPrefill(sp);
   const fromLink = hasBolusUrlPrefill(urlPrefill);
 
-  const [settings, recentMealsRaw, latest] = await Promise.all([
+  const [settings, recentMealsRaw, latestGlobal] = await Promise.all([
     getUserSettings(user.id),
     getRecentMealEntries(user.id, 12),
     getLatestGlucoseEntry(user.id),
   ]);
 
-  const recentMeals = toRecentMealOptions(recentMealsRaw);
   const bolusMathReady = bolusSettingsReady(settings);
 
-  const { initialMealContext, linkedMealMissing } =
+  const { initialMealContext, linkedMealMissing, linkedMealEatenAtIso } =
     await resolveBolusMealContextFromUrl(
       user.id,
       urlPrefill.linkedMealId,
       recentMealsRaw
     );
+
+  const glucoseAnchorIso =
+    linkedMealEatenAtIso ??
+    (urlPrefill.linkedMealId != null ? urlPrefill.linkedMealTimeIso : null);
+
+  const [recentMeals, glucoseAtOrBeforeAnchor] = await Promise.all([
+    buildRecentMealOptions(user.id, recentMealsRaw),
+    glucoseAnchorIso ?
+      getLatestGlucoseEntryAtOrBefore(user.id, glucoseAnchorIso)
+    : Promise.resolve(null),
+  ]);
+
+  let glucoseRow = glucoseAtOrBeforeAnchor;
+  if (
+    glucoseRow &&
+    glucoseAnchorIso &&
+    glucoseRow.measured_at > glucoseAnchorIso
+  ) {
+    glucoseRow = null;
+  }
+
+  let defaultGlucoseSuggestion: BolusGlucoseSuggestion | null = null;
+
+  if (glucoseAnchorIso) {
+    const v = glucoseRow?.glucose_value;
+    if (typeof v === "number" && Number.isFinite(v)) {
+      defaultGlucoseSuggestion = {
+        value: v,
+        measuredAt: glucoseRow!.measured_at,
+        scope: "at_or_before_meal",
+      };
+    }
+  } else {
+    const v = latestGlobal?.glucose_value;
+    if (typeof v === "number" && Number.isFinite(v)) {
+      defaultGlucoseSuggestion = {
+        value: v,
+        measuredAt: latestGlobal!.measured_at,
+        scope: "latest_global",
+      };
+    }
+  }
 
   return (
     <AppShell title="Помощник болюса">
@@ -146,12 +214,8 @@ export default async function BolusPage({ searchParams }: BolusPageProps) {
           urlPrefill={urlPrefill}
           initialMealContext={initialMealContext}
           linkedMealMissing={linkedMealMissing}
-          latestGlucose={
-            latest && typeof latest.glucose_value === "number"
-              ? latest.glucose_value
-              : null
-          }
-          latestGlucoseMeasuredAt={latest?.measured_at ?? null}
+          mealGlucoseReferenceIso={glucoseAnchorIso}
+          defaultGlucoseSuggestion={defaultGlucoseSuggestion}
         />
       </div>
     </AppShell>

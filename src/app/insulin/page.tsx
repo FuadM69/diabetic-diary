@@ -32,6 +32,8 @@ type InsulinPageProps = {
     units?: string | string[];
     entry_type?: string | string[];
     note?: string | string[];
+    flow?: string | string[];
+    fromMeal?: string | string[];
   }>;
 };
 
@@ -50,6 +52,11 @@ export default async function InsulinPage({ searchParams }: InsulinPageProps) {
 
   const entries = await getInsulinEntries(user.id, { takenAtGte });
   const queryPrefill = parseInsulinQueryPrefill(params);
+  const flowRaw = Array.isArray(params.flow) ? params.flow[0] : params.flow;
+  const fromMealRaw =
+    Array.isArray(params.fromMeal) ? params.fromMeal[0] : params.fromMeal;
+  const prefillFromBolusFlow = flowRaw === "bolus";
+  const prefillFromMeal = fromMealRaw === "1";
   /** Do not key the form by `entries.length` — it hid success feedback and confused users when back-dated rows were filtered out. */
   const formKey = `${range}-${queryPrefill ? `p-${queryPrefill.units}` : "np"}`;
   const takenAtDefault = defaultDatetimeLocalForUserSettings(settings.timezone);
@@ -83,7 +90,12 @@ export default async function InsulinPage({ searchParams }: InsulinPageProps) {
               . Показываются только введения <strong>не раньше</strong> этой
               отметки (время введения, как в настройках профиля):{" "}
               <span className="tabular-nums font-semibold text-white">
-                {formatUtcIsoForUserDisplay(takenAtGte, settings.timezone)}
+                {formatUtcIsoForUserDisplay(takenAtGte, settings.timezone, {
+                  dateStyle: "medium",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: false,
+                })}
               </span>
               . Более старые записи в таблице не скрыты навсегда — выберите
               период «Всё время», чтобы увидеть полный журнал.
@@ -120,6 +132,8 @@ export default async function InsulinPage({ searchParams }: InsulinPageProps) {
             savedUserTimezone={settings.timezone}
             activeRange={range}
             activeRangeLabel={GLUCOSE_RANGE_LABEL[range]}
+            prefillFromBolusFlow={prefillFromBolusFlow}
+            prefillFromMeal={prefillFromMeal}
           />
         </section>
 

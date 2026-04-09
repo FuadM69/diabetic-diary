@@ -1,7 +1,10 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { getCurrentUser } from "@/lib/auth/getUser";
+import { getInsulinEntries } from "@/lib/db/insulin";
 import { getMealEntries, getSelectableFoodProducts } from "@/lib/db/meals";
+import { getUserSettings } from "@/lib/db/settings";
+import { extractLinkedMealIdFromInsulinNote } from "@/lib/utils/bolus-prefill";
 import { formatDatetimeLocalValue } from "@/lib/utils/datetime-local";
 import { MealForm } from "./_components/meal-form";
 import { MealList } from "./_components/meal-list";
@@ -18,10 +21,24 @@ export default async function MealsPage() {
     redirect("/login");
   }
 
-  const [meals, products] = await Promise.all([
+  const [meals, products, settings, insulinEntries] = await Promise.all([
     getMealEntries(user.id),
     getSelectableFoodProducts(user.id),
+    getUserSettings(user.id),
+    getInsulinEntries(user.id, { entryTypes: ["bolus"] }),
   ]);
+
+  const linkedBolusByMealId = new Map<string, number>();
+  for (const e of insulinEntries) {
+    if (e.entry_type !== "bolus") {
+      continue;
+    }
+    const mealId = extractLinkedMealIdFromInsulinNote(e.note);
+    if (!mealId || linkedBolusByMealId.has(mealId)) {
+      continue;
+    }
+    linkedBolusByMealId.set(mealId, e.units);
+  }
 
   /** Stable across new rows in the journal so the create form keeps success UI after save. */
   const createFormKey = `meal-create|${products.length}`;
@@ -51,7 +68,12 @@ export default async function MealsPage() {
 
         <section id="meal-journal" className="scroll-mt-24 space-y-3">
           <h2 className={SECTION_TITLE}>Журнал</h2>
-          <MealList meals={meals} products={products} />
+          <MealList
+            meals={meals}
+            products={products}
+            userTimezone={settings.timezone}
+            linkedBolusByMealId={linkedBolusByMealId}
+          />
         </section>
       </div>
     </AppShell>

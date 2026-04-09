@@ -4,6 +4,7 @@ import {
   useActionState,
   useCallback,
   useEffect,
+  useId,
   useRef,
   useState,
 } from "react";
@@ -24,8 +25,8 @@ const initialState: MealActionResult = {
   error: null,
 };
 
-const inputClass =
-  "mt-2 w-full rounded-2xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none focus:border-white/35 disabled:opacity-60";
+const fieldClass =
+  "w-full rounded-2xl border border-white/15 bg-black/50 px-4 py-3 text-base text-white outline-none focus:border-white/35 disabled:opacity-60";
 
 function SaveButton() {
   const { pending } = useFormStatus();
@@ -65,6 +66,11 @@ function EditFormBody({
     initialState
   );
 
+  const fid = useId();
+  const eatenId = `${fid}-eaten`;
+  const mealTypeId = `${fid}-meal-type`;
+  const noteId = `${fid}-note`;
+
   useEffect(() => {
     if (state.success) {
       onSuccess();
@@ -80,26 +86,32 @@ function EditFormBody({
     >
       <input type="hidden" name="mealEntryId" value={meal.id} />
 
-      <label className="block text-sm text-white/70">
-        Когда съедено
+      <div className="space-y-2">
+        <label htmlFor={eatenId} className="block text-sm text-white/70">
+          Когда съедено
+        </label>
         <input
+          id={eatenId}
           name="eaten_at"
           type="datetime-local"
           required
           defaultValue={formatDatetimeLocalFromIso(meal.eaten_at)}
           disabled={isPending}
-          className={inputClass}
+          className={`${fieldClass} min-w-0 max-w-full`}
         />
-      </label>
+      </div>
 
-      <label className="block text-sm text-white/70">
-        Тип приёма
+      <div className="space-y-2">
+        <label htmlFor={mealTypeId} className="block text-sm text-white/70">
+          Тип приёма
+        </label>
         <select
+          id={mealTypeId}
           name="meal_type"
           required
           disabled={isPending}
           defaultValue={meal.meal_type}
-          className={inputClass}
+          className={fieldClass}
         >
           {MEAL_TYPE_KEYS.map((key) => (
             <option key={key} value={key}>
@@ -107,19 +119,22 @@ function EditFormBody({
             </option>
           ))}
         </select>
-      </label>
+      </div>
 
-      <label className="block text-sm text-white/70">
-        Комментарий
+      <div className="space-y-2">
+        <label htmlFor={noteId} className="block text-sm text-white/70">
+          Комментарий
+        </label>
         <textarea
+          id={noteId}
           name="note"
           rows={2}
           disabled={isPending}
           placeholder="Необязательно"
           defaultValue={meal.note ?? ""}
-          className={`${inputClass} resize-none`}
+          className={`${fieldClass} resize-none`}
         />
-      </label>
+      </div>
 
       <MealItemsEditor
         products={products}

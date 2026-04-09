@@ -117,6 +117,63 @@ export function parseUserSettingsForm(formData: FormData): ParseSettingsFormResu
     return { ok: false, message: isensP.message };
   }
 
+  const carbMorningP = parseOptionalPositiveFloat(
+    formData.get("carb_ratio_morning"),
+    "УК: утро"
+  );
+  if (!carbMorningP.ok) {
+    return { ok: false, message: carbMorningP.message };
+  }
+  const carbDayP = parseOptionalPositiveFloat(
+    formData.get("carb_ratio_day"),
+    "УК: день"
+  );
+  if (!carbDayP.ok) {
+    return { ok: false, message: carbDayP.message };
+  }
+  const carbEveningP = parseOptionalPositiveFloat(
+    formData.get("carb_ratio_evening"),
+    "УК: вечер"
+  );
+  if (!carbEveningP.ok) {
+    return { ok: false, message: carbEveningP.message };
+  }
+  const carbNightP = parseOptionalPositiveFloat(
+    formData.get("carb_ratio_night"),
+    "УК: ночь"
+  );
+  if (!carbNightP.ok) {
+    return { ok: false, message: carbNightP.message };
+  }
+  const isensMorningP = parseOptionalPositiveFloat(
+    formData.get("insulin_sensitivity_morning"),
+    "Чувствительность: утро"
+  );
+  if (!isensMorningP.ok) {
+    return { ok: false, message: isensMorningP.message };
+  }
+  const isensDayP = parseOptionalPositiveFloat(
+    formData.get("insulin_sensitivity_day"),
+    "Чувствительность: день"
+  );
+  if (!isensDayP.ok) {
+    return { ok: false, message: isensDayP.message };
+  }
+  const isensEveningP = parseOptionalPositiveFloat(
+    formData.get("insulin_sensitivity_evening"),
+    "Чувствительность: вечер"
+  );
+  if (!isensEveningP.ok) {
+    return { ok: false, message: isensEveningP.message };
+  }
+  const isensNightP = parseOptionalPositiveFloat(
+    formData.get("insulin_sensitivity_night"),
+    "Чувствительность: ночь"
+  );
+  if (!isensNightP.ok) {
+    return { ok: false, message: isensNightP.message };
+  }
+
   const tzRaw = formData.get("timezone");
   let timezone: string | null = null;
   if (typeof tzRaw === "string") {
@@ -137,6 +194,14 @@ export function parseUserSettingsForm(formData: FormData): ParseSettingsFormResu
       glucose_target_max: maxP.value,
       carb_ratio: carbP.value,
       insulin_sensitivity: isensP.value,
+      carb_ratio_morning: carbMorningP.value,
+      carb_ratio_day: carbDayP.value,
+      carb_ratio_evening: carbEveningP.value,
+      carb_ratio_night: carbNightP.value,
+      insulin_sensitivity_morning: isensMorningP.value,
+      insulin_sensitivity_day: isensDayP.value,
+      insulin_sensitivity_evening: isensEveningP.value,
+      insulin_sensitivity_night: isensNightP.value,
       timezone,
     },
   };

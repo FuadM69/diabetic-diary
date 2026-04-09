@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 import {
   createFoodProductAction,
@@ -11,7 +11,7 @@ import { FEEDBACK_ERROR, FEEDBACK_SUCCESS } from "@/lib/ui/page-patterns";
 const initial: FoodActionResult = { success: false, error: null };
 
 const inputClass =
-  "mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none placeholder:text-white/40 focus:border-white/30 disabled:opacity-60";
+  "mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-base text-white outline-none placeholder:text-white/40 focus:border-white/30 disabled:opacity-60";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -31,17 +31,23 @@ type FoodProductFormProps = {
 };
 
 export function FoodProductForm({ formKey }: FoodProductFormProps) {
+  const [isDrink, setIsDrink] = useState(false);
   const [state, formAction, isPending] = useActionState(
     async (_prev: FoodActionResult, formData: FormData) =>
       createFoodProductAction(formData),
     initial
   );
 
+  useEffect(() => {
+    setIsDrink(false);
+  }, [formKey]);
+
   return (
     <form key={formKey} action={formAction} className="space-y-4">
       <h3 className="text-sm font-medium text-white/85">Новый продукт</h3>
       <p className="text-xs text-white/45">
-        Продукт будет виден только вам. Значения — на 100 г.
+        Продукт будет виден только вам. Для еды вводите на 100 г, для напитков —
+        на 100 мл.
       </p>
 
       <label className="block text-sm text-white/70">
@@ -51,9 +57,22 @@ export function FoodProductForm({ formKey }: FoodProductFormProps) {
           type="text"
           required
           disabled={isPending}
-          placeholder="Например, Гречка отварная"
+          placeholder={isDrink ? "Например, Яблочный сок" : "Например, Гречка отварная"}
           className={inputClass}
         />
+      </label>
+
+      <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/75">
+        <input
+          type="checkbox"
+          name="is_drink"
+          value="1"
+          checked={isDrink}
+          onChange={(e) => setIsDrink(e.target.checked)}
+          disabled={isPending}
+          className="size-4 accent-white"
+        />
+        Это напиток (показывать в разделе напитков)
       </label>
 
       <label className="block text-sm text-white/70">
@@ -69,7 +88,7 @@ export function FoodProductForm({ formKey }: FoodProductFormProps) {
 
       <div className="grid grid-cols-2 gap-3">
         <label className="block text-sm text-white/70">
-          Углеводы (г) *
+          Углеводы ({isDrink ? "г/100 мл" : "г"}) *
           <input
             name="carbs_per_100g"
             type="number"
@@ -82,7 +101,7 @@ export function FoodProductForm({ formKey }: FoodProductFormProps) {
           />
         </label>
         <label className="block text-sm text-white/70">
-          Ккал *
+          Ккал {isDrink ? "/100 мл" : ""} *
           <input
             name="calories_per_100g"
             type="number"
@@ -95,7 +114,7 @@ export function FoodProductForm({ formKey }: FoodProductFormProps) {
           />
         </label>
         <label className="block text-sm text-white/70">
-          Белки (г) *
+          Белки ({isDrink ? "г/100 мл" : "г"}) *
           <input
             name="protein_per_100g"
             type="number"
@@ -108,7 +127,7 @@ export function FoodProductForm({ formKey }: FoodProductFormProps) {
           />
         </label>
         <label className="block text-sm text-white/70">
-          Жиры (г) *
+          Жиры ({isDrink ? "г/100 мл" : "г"}) *
           <input
             name="fat_per_100g"
             type="number"

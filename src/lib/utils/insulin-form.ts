@@ -8,7 +8,11 @@ import {
 /** Upper bound for units (typical pump/pen diary). */
 export const INSULIN_UNITS_MAX = 300;
 
-/** Set `INSULIN_DEBUG=1` for temporary insulin create/update tracing (server). */
+/**
+ * Server-only: set `INSULIN_DEBUG=1` in `.env.local` (restart dev server).
+ * Logs FormData → parsed payload → DB insert (user_id, entry_type, taken_at UTC).
+ * Does not log secrets; safe for staging. Remove or unset when done.
+ */
 export function isInsulinDebugLogEnabled(): boolean {
   return process.env.INSULIN_DEBUG === "1";
 }

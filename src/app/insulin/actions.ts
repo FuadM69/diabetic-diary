@@ -131,7 +131,13 @@ export async function createInsulinEntryAction(
     savedEntryTypeLabel: INSULIN_ENTRY_TYPE_LABEL_RU[row.entry_type],
     savedTakenAtDisplay: formatUtcIsoForUserDisplay(
       row.taken_at,
-      settings.timezone
+      settings.timezone,
+      {
+        dateStyle: "medium",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }
     ),
   };
 }
@@ -181,7 +187,13 @@ export async function updateInsulinEntryAction(
     savedEntryTypeLabel: INSULIN_ENTRY_TYPE_LABEL_RU[row.entry_type],
     savedTakenAtDisplay: formatUtcIsoForUserDisplay(
       row.taken_at,
-      settings.timezone
+      settings.timezone,
+      {
+        dateStyle: "medium",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }
     ),
   };
 }

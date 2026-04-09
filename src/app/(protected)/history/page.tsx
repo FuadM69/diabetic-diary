@@ -1,189 +1,150 @@
-"use client";
-
-import { useMemo, useSyncExternalStore } from "react";
+import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
-
-type GlucoseEntry = {
-  id: string;
-  value: string;
-  createdAt: string;
-};
-
-type MealItem = {
-  id: string;
-  productId: string;
-  productName: string;
-  grams: string;
-  calories: number;
-  protein: number;
-  fat: number;
-  carbs: number;
-  xe: number;
-};
-
-type SavedMeal = {
-  id: string;
-  createdAt: string;
-  items: MealItem[];
-  totalCalories: number;
-  totalProtein: number;
-  totalFat: number;
-  totalCarbs: number;
-  totalXe: number;
-};
-
-type InsulinEntry = {
-  id: string;
-  insulinKind: "bolus" | "basal";
-  insulinType: string;
-  dose: string;
-  comment: string;
-  createdAt: string;
-};
+import { getCurrentUser } from "@/lib/auth/getUser";
+import { getGlucoseEntries } from "@/lib/db/glucose";
+import { getInsulinEntries } from "@/lib/db/insulin";
+import { getMealEntries } from "@/lib/db/meals";
+import { getUserSettings } from "@/lib/db/settings";
+import {
+  extractLinkedMealIdFromInsulinNote,
+  stripLinkedMealMarkerFromInsulinNote,
+} from "@/lib/utils/bolus-prefill";
+import { formatUtcIsoForUserDisplay } from "@/lib/utils/datetime-local-tz";
+import { getDisplayProductName } from "@/lib/utils/food-product-kind";
+import { formatGlucoseValue } from "@/lib/utils/glucose";
+import { sumCaloriesFromItems, sumCarbsFromItems } from "@/lib/utils/meal-nutrition";
+import { INSULIN_ENTRY_TYPE_LABEL_RU } from "@/lib/utils/insulin";
 
 type TimelineItem =
   | {
       id: string;
       type: "glucose";
-      createdAt: string;
-      data: GlucoseEntry;
+      occurredAt: string;
+      data: Awaited<ReturnType<typeof getGlucoseEntries>>[number];
     }
   | {
       id: string;
       type: "meal";
-      createdAt: string;
-      data: SavedMeal;
+      occurredAt: string;
+      data: Awaited<ReturnType<typeof getMealEntries>>[number];
     }
   | {
       id: string;
       type: "insulin";
-      createdAt: string;
-      data: InsulinEntry;
+      occurredAt: string;
+      data: Awaited<ReturnType<typeof getInsulinEntries>>[number];
     };
 
-function subscribeStorage(onChange: () => void) {
-  window.addEventListener("storage", onChange);
-  return () => window.removeEventListener("storage", onChange);
-}
-
-function historyStorageFingerprint(): string {
-  try {
-    return [
-      localStorage.getItem("glucose_entries") ?? "",
-      localStorage.getItem("meal_history") ?? "",
-      localStorage.getItem("insulin_entries") ?? "",
-    ].join("\u001f");
-  } catch {
-    return "";
-  }
-}
-
-function buildTimelineFromStorage(): TimelineItem[] {
-  let glucoseEntries: GlucoseEntry[] = [];
-  let mealHistory: SavedMeal[] = [];
-  let insulinEntries: InsulinEntry[] = [];
-
-  const savedGlucoseEntries = localStorage.getItem("glucose_entries");
-  if (savedGlucoseEntries) {
-    try {
-      const parsed: GlucoseEntry[] = JSON.parse(savedGlucoseEntries);
-      glucoseEntries = Array.isArray(parsed) ? parsed : [];
-    } catch {
-      glucoseEntries = [];
-    }
-  }
-
-  const savedMealHistory = localStorage.getItem("meal_history");
-  if (savedMealHistory) {
-    try {
-      const parsed: SavedMeal[] = JSON.parse(savedMealHistory);
-      mealHistory = Array.isArray(parsed) ? parsed : [];
-    } catch {
-      mealHistory = [];
-    }
-  }
-
-  const savedInsulinEntries = localStorage.getItem("insulin_entries");
-  if (savedInsulinEntries) {
-    try {
-      const parsed: InsulinEntry[] = JSON.parse(savedInsulinEntries);
-      insulinEntries = Array.isArray(parsed) ? parsed : [];
-    } catch {
-      insulinEntries = [];
-    }
-  }
-
+function buildTimeline(
+  glucoseEntries: Awaited<ReturnType<typeof getGlucoseEntries>>,
+  mealEntries: Awaited<ReturnType<typeof getMealEntries>>,
+  insulinEntries: Awaited<ReturnType<typeof getInsulinEntries>>
+): TimelineItem[] {
   const timelineItems: TimelineItem[] = [
     ...glucoseEntries.map((entry) => ({
       id: `glucose-${entry.id}`,
       type: "glucose" as const,
-      createdAt: entry.createdAt,
+      occurredAt: entry.measured_at,
       data: entry,
     })),
-    ...mealHistory.map((meal) => ({
+    ...mealEntries.map((meal) => ({
       id: `meal-${meal.id}`,
       type: "meal" as const,
-      createdAt: meal.createdAt,
+      occurredAt: meal.eaten_at,
       data: meal,
     })),
     ...insulinEntries.map((entry) => ({
       id: `insulin-${entry.id}`,
       type: "insulin" as const,
-      createdAt: entry.createdAt,
+      occurredAt: entry.taken_at,
       data: entry,
     })),
   ];
 
   timelineItems.sort(
-    (a, b) =>
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    (a, b) => b.occurredAt.localeCompare(a.occurredAt)
   );
 
   return timelineItems;
 }
 
-export default function HistoryPage() {
-  const storageKey = useSyncExternalStore(
-    subscribeStorage,
-    historyStorageFingerprint,
-    () => ""
-  );
+export default async function HistoryPage() {
+  const user = await getCurrentUser();
+  if (!user) {
+    redirect("/login");
+  }
 
-  const timeline = useMemo(() => {
-    void storageKey;
-    return buildTimelineFromStorage();
-  }, [storageKey]);
+  const [settings, glucoseEntries, mealEntries, insulinEntries] = await Promise.all([
+    getUserSettings(user.id),
+    getGlucoseEntries(user.id),
+    getMealEntries(user.id),
+    getInsulinEntries(user.id),
+  ]);
+
+  const timeline = buildTimeline(glucoseEntries, mealEntries, insulinEntries);
+  const linkedBolusByMealId = new Map<string, number>();
+  for (const e of insulinEntries) {
+    if (e.entry_type !== "bolus") {
+      continue;
+    }
+    const mealId = extractLinkedMealIdFromInsulinNote(e.note);
+    if (!mealId || linkedBolusByMealId.has(mealId)) {
+      continue;
+    }
+    linkedBolusByMealId.set(mealId, e.units);
+  }
 
   return (
     <AppShell title="История">
-      <div className="space-y-4">
-        <section className="rounded-3xl border border-white/10 bg-white/5 p-4">
+      <div className="space-y-5">
+        <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
           <h2 className="text-xl font-semibold">Единый дневник</h2>
-          <p className="mt-2 text-sm text-white/70">
+          <p className="mt-1.5 text-sm text-white/60">
             Глюкоза, приемы пищи и инсулин в одной ленте
           </p>
         </section>
 
         {timeline.length === 0 ? (
-          <section className="rounded-3xl border border-white/10 bg-white/5 p-4">
+          <section className="rounded-3xl border border-dashed border-white/15 bg-white/[0.02] p-6 text-center">
             <p className="text-sm text-white/70">Записей пока нет</p>
+            <p className="mt-1 text-xs text-white/45">
+              Добавьте первый замер, приём пищи или запись инсулина.
+            </p>
           </section>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3.5">
             {timeline.map((item) => {
               if (item.type === "glucose") {
                 return (
                   <section
                     key={item.id}
-                    className="rounded-3xl border border-white/10 bg-white/5 p-4"
+                    className="rounded-3xl border border-red-500/25 bg-red-500/[0.06] p-4"
                   >
-                    <p className="text-xs uppercase tracking-wide text-white/50">
-                      Глюкоза
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="rounded-full border border-red-400/35 bg-red-400/12 px-2.5 py-0.5 text-[0.65rem] font-medium uppercase tracking-wide text-red-100/90">
+                        Глюкоза
+                      </p>
+                      <p className="shrink-0 tabular-nums text-[0.72rem] text-white/55">
+                        {formatUtcIsoForUserDisplay(
+                          item.occurredAt,
+                          settings.timezone,
+                          {
+                            dateStyle: "medium",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            hour12: false,
+                          }
+                        )}
+                      </p>
+                    </div>
+                    <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-white">
+                      {formatGlucoseValue(item.data.glucose_value)}
                     </p>
-                    <p className="mt-2 text-2xl font-semibold">{item.data.value}</p>
-                    <p className="mt-2 text-sm text-white/60">
-                      {new Date(item.createdAt).toLocaleString("ru-RU")}
-                    </p>
+                    {item.data.note ? (
+                      <p className="mt-2 border-t border-white/10 pt-2 text-sm text-white/72">
+                        {item.data.note}
+                      </p>
+                    ) : null}
                   </section>
                 );
               }
@@ -192,63 +153,104 @@ export default function HistoryPage() {
                 return (
                   <section
                     key={item.id}
-                    className="rounded-3xl border border-white/10 bg-white/5 p-4"
+                    className="rounded-3xl border border-sky-500/25 bg-sky-500/[0.06] p-4"
                   >
-                    <p className="text-xs uppercase tracking-wide text-white/50">
-                      Прием пищи
-                    </p>
-                    <p className="mt-2 text-sm text-white/60">
-                      {new Date(item.createdAt).toLocaleString("ru-RU")}
-                    </p>
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <p className="rounded-full border border-sky-400/35 bg-sky-400/12 px-2.5 py-0.5 text-[0.65rem] font-medium uppercase tracking-wide text-sky-100/90">
+                        Приём пищи
+                      </p>
+                      <p className="shrink-0 tabular-nums text-[0.72rem] text-white/55">
+                        {formatUtcIsoForUserDisplay(
+                          item.occurredAt,
+                          settings.timezone,
+                          {
+                            dateStyle: "medium",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            hour12: false,
+                          }
+                        )}
+                      </p>
+                      {linkedBolusByMealId.has(item.data.id) ? (
+                        <p className="text-xs text-emerald-200/90">
+                          Болюс:{" "}
+                          <span className="tabular-nums font-medium">
+                            {linkedBolusByMealId.get(item.data.id)}
+                          </span>{" "}
+                          ед.
+                        </p>
+                      ) : null}
+                    </div>
 
-                    <div className="mt-3 space-y-1 text-sm text-white/80">
-                      {item.data.items.map((mealItem) => (
+                    <div className="mt-2.5 space-y-1 text-sm text-white/82">
+                      {item.data.meal_items.map((mealItem) => (
                         <p key={mealItem.id}>
-                          {mealItem.productName} - {mealItem.grams} г
+                          {getDisplayProductName(mealItem.productName)} -{" "}
+                          {mealItem.grams} г
                         </p>
                       ))}
                     </div>
 
-                    <div className="mt-3 rounded-2xl border border-white/10 bg-black/30 p-3">
-                      <p className="text-sm text-white/70">
-                        Калории: {item.data.totalCalories.toFixed(2)}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <p className="rounded-xl border border-white/10 bg-black/30 px-2.5 py-1 text-xs text-white/70">
+                        Калории:{" "}
+                        <span className="tabular-nums">
+                          {sumCaloriesFromItems(item.data.meal_items).toFixed(2)}
+                        </span>
                       </p>
-                      <p className="text-sm text-white/70">
-                        Белки: {item.data.totalProtein.toFixed(2)}
-                      </p>
-                      <p className="text-sm text-white/70">
-                        Жиры: {item.data.totalFat.toFixed(2)}
-                      </p>
-                      <p className="text-sm text-white/70">
-                        Углеводы: {item.data.totalCarbs.toFixed(2)}
-                      </p>
-                      <p className="text-sm text-white">
-                        ХЕ: {item.data.totalXe.toFixed(2)}
+                      <p className="rounded-xl border border-white/10 bg-black/30 px-2.5 py-1 text-xs text-white/70">
+                        Углеводы:{" "}
+                        <span className="tabular-nums">
+                          {sumCarbsFromItems(item.data.meal_items).toFixed(2)}
+                        </span>
                       </p>
                     </div>
+                    {item.data.note ? (
+                      <p className="mt-2 border-t border-white/10 pt-2 text-sm text-white/72">
+                        {item.data.note}
+                      </p>
+                    ) : null}
                   </section>
                 );
               }
 
+              const noteForDisplay = stripLinkedMealMarkerFromInsulinNote(
+                item.data.note
+              );
               return (
                 <section
                   key={item.id}
-                  className="rounded-3xl border border-white/10 bg-white/5 p-4"
+                  className="rounded-3xl border border-violet-500/25 bg-violet-500/[0.06] p-4"
                 >
-                  <p className="text-xs uppercase tracking-wide text-white/50">
-                    Инсулин
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="inline-flex rounded-full border border-violet-400/35 bg-violet-400/12 px-2.5 py-0.5 text-[0.65rem] font-medium uppercase tracking-wide text-violet-100/90">
+                      Инсулин
+                    </p>
+                    <p className="shrink-0 tabular-nums text-[0.72rem] text-white/55">
+                      {formatUtcIsoForUserDisplay(item.occurredAt, settings.timezone, {
+                        dateStyle: "medium",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: false,
+                      })}
+                    </p>
+                  </div>
+                  <p className="mt-2 text-sm text-white/72">
+                    {INSULIN_ENTRY_TYPE_LABEL_RU[item.data.entry_type]}
                   </p>
-                  <p className="mt-1 text-sm text-white/70">
-                    {item.data.insulinKind === "bolus" ? "Болюсный" : "Базальный"}
+                  {item.data.insulin_name ? (
+                    <p className="mt-1 text-lg font-semibold text-white">
+                      {item.data.insulin_name}
+                    </p>
+                  ) : null}
+                  <p className="mt-1 text-sm text-white/84">
+                    {item.data.units} ед.
                   </p>
-                  <p className="mt-1 text-lg font-semibold">{item.data.insulinType}</p>
-                  <p className="mt-1 text-sm text-white/80">{item.data.dose} ед.</p>
-                  {item.data.comment && (
-                    <p className="mt-1 text-sm text-white/70">{item.data.comment}</p>
-                  )}
-                  <p className="mt-2 text-sm text-white/60">
-                    {new Date(item.createdAt).toLocaleString("ru-RU")}
-                  </p>
+                  {noteForDisplay ? (
+                    <p className="mt-2 border-t border-white/10 pt-2 text-sm text-white/72">
+                      {noteForDisplay}
+                    </p>
+                  ) : null}
                 </section>
               );
             })}

@@ -1,4 +1,17 @@
 import type { UserSettings } from "@/lib/types/glucose";
+import { explainLogRangeTimeZone, readZonedWallClockParts } from "@/lib/utils/log-range-bounds";
+
+export type BolusTimeOfDayKey = "morning" | "day" | "evening" | "night";
+
+export type BolusResolvedSettings = {
+  block: BolusTimeOfDayKey;
+  blockLabel: string;
+  carbRatio: number | null;
+  insulinSensitivity: number | null;
+  usesFallbackCarbRatio: boolean;
+  usesFallbackSensitivity: boolean;
+  ready: boolean;
+};
 
 export type BolusValidatedInput = {
   carbs: number;
@@ -25,6 +38,84 @@ export function bolusSettingsReady(settings: UserSettings): boolean {
 
 export function bolusSettingsMissingMessage(): string {
   return "Укажите в настройках углеводный коэффициент и чувствительность к инсулину — без обоих полей помощник не считает оценку болюса.";
+}
+
+function isPositiveNumber(v: number | null | undefined): v is number {
+  return typeof v === "number" && Number.isFinite(v) && v > 0;
+}
+
+function getTimeBlockByHour(hour: number): BolusTimeOfDayKey {
+  if (hour >= 6 && hour < 12) {
+    return "morning";
+  }
+  if (hour >= 12 && hour < 18) {
+    return "day";
+  }
+  if (hour >= 18 && hour < 24) {
+    return "evening";
+  }
+  return "night";
+}
+
+export function getBolusTimeBlockLabelRu(block: BolusTimeOfDayKey): string {
+  if (block === "morning") {
+    return "утро (06:00-11:59)";
+  }
+  if (block === "day") {
+    return "день (12:00-17:59)";
+  }
+  if (block === "evening") {
+    return "вечер (18:00-23:59)";
+  }
+  return "ночь (00:00-05:59)";
+}
+
+function resolveBolusTimeBlock(
+  settings: UserSettings,
+  mealTimeIso: string | null
+): BolusTimeOfDayKey {
+  const instant = mealTimeIso ? new Date(mealTimeIso) : new Date();
+  const safeInstant = Number.isNaN(instant.getTime()) ? new Date() : instant;
+  const tz = explainLogRangeTimeZone(settings.timezone).resolvedTimeZone;
+  const hour = readZonedWallClockParts(safeInstant, tz).hour;
+  return getTimeBlockByHour(hour);
+}
+
+export function resolveBolusSettingsForTime(
+  settings: UserSettings,
+  mealTimeIso: string | null
+): BolusResolvedSettings {
+  const block = resolveBolusTimeBlock(settings, mealTimeIso);
+  const blockLabel = getBolusTimeBlockLabelRu(block);
+  const carbByBlock =
+    block === "morning" ? settings.carb_ratio_morning
+    : block === "day" ? settings.carb_ratio_day
+    : block === "evening" ? settings.carb_ratio_evening
+    : settings.carb_ratio_night;
+  const isfByBlock =
+    block === "morning" ? settings.insulin_sensitivity_morning
+    : block === "day" ? settings.insulin_sensitivity_day
+    : block === "evening" ? settings.insulin_sensitivity_evening
+    : settings.insulin_sensitivity_night;
+
+  const hasBlockCarb = isPositiveNumber(carbByBlock);
+  const hasBlockIsf = isPositiveNumber(isfByBlock);
+  const carbRatio = hasBlockCarb ? carbByBlock : settings.carb_ratio;
+  const insulinSensitivity = hasBlockIsf ? isfByBlock : settings.insulin_sensitivity;
+
+  return {
+    block,
+    blockLabel,
+    carbRatio: isPositiveNumber(carbRatio) ? carbRatio : null,
+    insulinSensitivity: isPositiveNumber(insulinSensitivity)
+      ? insulinSensitivity
+      : null,
+    usesFallbackCarbRatio: !hasBlockCarb,
+    usesFallbackSensitivity: !hasBlockIsf,
+    ready:
+      isPositiveNumber(hasBlockCarb ? carbByBlock : settings.carb_ratio) &&
+      isPositiveNumber(hasBlockIsf ? isfByBlock : settings.insulin_sensitivity),
+  };
 }
 
 function parseNonNegativeCarbs(

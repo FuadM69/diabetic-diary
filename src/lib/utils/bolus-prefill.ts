@@ -11,8 +11,9 @@ import {
 /** Reasonable upper bound for "carbs this meal" in the helper (g). */
 const BOLUS_PREFILL_CARBS_MAX = 2000;
 
+/** Postgres / Supabase `uuid`; do not restrict RFC version bits — strict patterns dropped valid ids and broke meal-linked bolus. */
 const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type BolusUrlPrefill = {
   /** Initial field value for carbs (may be empty). */
@@ -21,7 +22,15 @@ export type BolusUrlPrefill = {
   glucose: string;
   /** Optional meal id from journal (for note / context only). */
   linkedMealId: string | null;
+  /**
+   * Optional meal `eaten_at` (UTC ISO) from the journal link — anchors glucose “at or before”
+   * when the id is present, even if the row is not in the recent list.
+   */
+  linkedMealTimeIso: string | null;
 };
+
+const LINKED_MEAL_NOTE_MARKER_PREFIX = "[meal:";
+const LINKED_MEAL_NOTE_MARKER_SUFFIX = "]";
 
 function firstQueryValue(
   v: string | string[] | undefined
@@ -81,8 +90,24 @@ function parseOptionalMealId(raw: string | undefined): string | null {
   return t;
 }
 
+/** `mealTime` query: must parse to a finite instant (UTC ISO round-trip). */
+function parseOptionalMealTimeIso(raw: string | undefined): string | null {
+  if (raw === undefined) {
+    return null;
+  }
+  const t = raw.trim();
+  if (!t) {
+    return null;
+  }
+  const ms = Date.parse(t);
+  if (!Number.isFinite(ms)) {
+    return null;
+  }
+  return new Date(ms).toISOString();
+}
+
 /**
- * Reads `carbs`, `glucose`, `mealId` from Next.js searchParams.
+ * Reads `carbs`, `glucose`, `mealId`, `mealTime` from Next.js searchParams.
  * Invalid numbers are ignored (empty string); invalid meal id ignored.
  */
 export function parseBolusUrlPrefill(
@@ -92,6 +117,7 @@ export function parseBolusUrlPrefill(
     carbs: parseOptionalCarbs(firstQueryValue(raw.carbs)),
     glucose: parseOptionalGlucose(firstQueryValue(raw.glucose)),
     linkedMealId: parseOptionalMealId(firstQueryValue(raw.mealId)),
+    linkedMealTimeIso: parseOptionalMealTimeIso(firstQueryValue(raw.mealTime)),
   };
 }
 
@@ -99,7 +125,8 @@ export function hasBolusUrlPrefill(p: BolusUrlPrefill): boolean {
   return (
     p.carbs.length > 0 ||
     p.glucose.length > 0 ||
-    p.linkedMealId != null
+    p.linkedMealId != null ||
+    p.linkedMealTimeIso != null
   );
 }
 
@@ -109,10 +136,41 @@ export function buildInsulinNoteFromBolusContext(params: {
   linkedMealId: string | null;
 }): string {
   let s = `Болюс по оценке помощника: ${formatBolusDose(params.totalBolus)} УЕ. Проверьте дозу перед введением.`;
-  if (params.linkedMealId) {
-    s += " Связано с приёмом пищи из журнала.";
+  if (params.linkedMealId && UUID_RE.test(params.linkedMealId)) {
+    const marker = `${LINKED_MEAL_NOTE_MARKER_PREFIX}${params.linkedMealId}${LINKED_MEAL_NOTE_MARKER_SUFFIX}`;
+    const markerSuffix = ` ${marker}`;
+    const maxBase = Math.max(0, INSULIN_NOTE_PREFILL_MAX - markerSuffix.length);
+    s = s.slice(0, maxBase);
+    s += markerSuffix;
   }
   return s.slice(0, INSULIN_NOTE_PREFILL_MAX);
+}
+
+export function extractLinkedMealIdFromInsulinNote(
+  note: string | null | undefined
+): string | null {
+  if (!note || typeof note !== "string") {
+    return null;
+  }
+  const m = note.match(/\[meal:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\]/i);
+  if (!m) {
+    return null;
+  }
+  const id = m[1];
+  return UUID_RE.test(id) ? id : null;
+}
+
+export function stripLinkedMealMarkerFromInsulinNote(
+  note: string | null | undefined
+): string | null {
+  if (!note || typeof note !== "string") {
+    return null;
+  }
+  const cleaned = note
+    .replace(/\s*\[meal:[0-9a-f-]{36}\]/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  return cleaned.length > 0 ? cleaned : null;
 }
 
 export function buildInsulinPrefillHref(params: {
@@ -123,6 +181,10 @@ export function buildInsulinPrefillHref(params: {
   const q = new URLSearchParams();
   q.set("units", String(roundInsulinPrefillUnits(params.totalBolus)));
   q.set("entry_type", "bolus");
+  q.set("flow", "bolus");
+  if (params.linkedMealId) {
+    q.set("fromMeal", "1");
+  }
   if (note.length > 0) {
     q.set("note", note);
   }

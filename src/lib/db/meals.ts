@@ -30,7 +30,7 @@ export async function getSelectableFoodProducts(
 }
 
 export type CreateMealResult =
-  | { ok: true; mealId: string; totalCarbs: number }
+  | { ok: true; mealId: string; totalCarbs: number; eatenAtIso: string }
   | { ok: false; errorMessage: string };
 
 export async function createMealEntry(
@@ -104,7 +104,7 @@ export async function createMealEntry(
   }
 
   const totalCarbs = sumCarbsFromItems(itemRows);
-  return { ok: true, mealId, totalCarbs };
+  return { ok: true, mealId, totalCarbs, eatenAtIso: payload.eaten_at };
 }
 
 function assembleMealsWithItems(

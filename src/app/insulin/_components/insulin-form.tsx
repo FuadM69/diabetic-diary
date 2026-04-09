@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
-import { useFormStatus } from "react-dom";
 import type { GlucoseRangeKey } from "@/lib/types/glucose";
 import { INSULIN_ENTRY_TYPES } from "@/lib/types/insulin";
 import {
@@ -24,8 +23,13 @@ const initial: InsulinActionResult = { success: false, error: null };
 const inputClass =
   "mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-base text-white outline-none placeholder:text-white/40 focus:border-white/30 disabled:opacity-60";
 
-function SubmitButton({ disabled }: { disabled: boolean }) {
-  const { pending } = useFormStatus();
+function SubmitButton({
+  disabled,
+  pending,
+}: {
+  disabled: boolean;
+  pending: boolean;
+}) {
   return (
     <button
       type="submit"
@@ -49,6 +53,10 @@ type InsulinFormProps = {
   /** Active journal period (list filter); used to explain visibility after save. */
   activeRange: GlucoseRangeKey;
   activeRangeLabel: string;
+  /** Explicit UX marker from bolus prefill link. */
+  prefillFromBolusFlow?: boolean;
+  /** Whether bolus prefill came from a meal-linked context. */
+  prefillFromMeal?: boolean;
 };
 
 export function InsulinForm({
@@ -58,6 +66,8 @@ export function InsulinForm({
   savedUserTimezone,
   activeRange,
   activeRangeLabel,
+  prefillFromBolusFlow = false,
+  prefillFromMeal = false,
 }: InsulinFormProps) {
   const takenAtTzCaption = getInsulinTakenAtTimezoneCaption(savedUserTimezone);
   const [takenAt, setTakenAt] = useState(defaultTakenAtLocal);
@@ -84,6 +94,7 @@ export function InsulinForm({
   }, [state]);
 
   const blockSubmit = Boolean(timezoneConfigError);
+  const disabled = blockSubmit || isPending;
   const combinedError =
     timezoneConfigError || browserValidationError || state.error;
 
@@ -93,7 +104,7 @@ export function InsulinForm({
       className="space-y-4"
       onSubmit={(e) => {
         const form = e.currentTarget;
-        if (blockSubmit) {
+        if (disabled) {
           e.preventDefault();
           return;
         }
@@ -120,6 +131,22 @@ export function InsulinForm({
         }
       }}
     >
+      {prefillFromBolusFlow && !state.success ? (
+        <div
+          className="rounded-2xl border border-sky-500/30 bg-sky-950/25 px-3 py-2.5 text-xs leading-relaxed text-sky-100/90"
+          role="status"
+        >
+          <p className="font-medium">
+            Статус: шаг 2 из 3 — черновик дозы перенесён в форму инсулина.
+          </p>
+          <p className="mt-1 text-sky-100/80">
+            Проверьте дозу и время, затем нажмите «Добавить запись», чтобы
+            завершить шаг 3 (сохранение в журнал).
+            {prefillFromMeal ? " Источник: расчёт из приёма пищи." : ""}
+          </p>
+        </div>
+      ) : null}
+
       <div>
         <label className="block text-sm text-white/70">
           Когда введено
@@ -129,7 +156,7 @@ export function InsulinForm({
             required
             value={takenAt}
             onChange={(e) => setTakenAt(e.target.value)}
-            disabled={blockSubmit}
+            disabled={disabled}
             className={inputClass}
           />
         </label>
@@ -140,7 +167,7 @@ export function InsulinForm({
         ) : null}
       </div>
 
-      <fieldset className="space-y-2" disabled={blockSubmit}>
+      <fieldset className="space-y-2" disabled={disabled}>
         <legend className="text-sm text-white/70">Тип</legend>
         <div
           key={fieldKey}
@@ -176,7 +203,7 @@ export function InsulinForm({
           min={0.05}
           step="any"
           required
-          disabled={blockSubmit}
+          disabled={disabled}
           defaultValue={queryPrefill?.units}
           placeholder="например, 4"
           className={inputClass}
@@ -190,7 +217,7 @@ export function InsulinForm({
           key={`name-${fieldKey}`}
           name="insulin_name"
           type="text"
-          disabled={blockSubmit}
+          disabled={disabled}
           placeholder="например, Новорапид"
           className={inputClass}
         />
@@ -203,7 +230,7 @@ export function InsulinForm({
           key={`note-${fieldKey}`}
           name="note"
           rows={2}
-          disabled={blockSubmit}
+          disabled={disabled}
           defaultValue={queryPrefill?.note ?? ""}
           placeholder="комментарий к введению"
           className={`${inputClass} resize-none`}
@@ -219,6 +246,12 @@ export function InsulinForm({
           {", "}
           <span className="tabular-nums">{state.savedTakenAtDisplay}</span> —
           как в журнале (время по настройкам профиля).
+          {prefillFromBolusFlow ? (
+            <>
+              {" "}
+              Статус: шаг 3 из 3 — запись сохранена в журнал инсулина.
+            </>
+          ) : null}
           {activeRange !== "all" ? (
             <>
               {" "}
@@ -245,7 +278,7 @@ export function InsulinForm({
         </p>
       ) : null}
 
-      <SubmitButton disabled={blockSubmit} />
+      <SubmitButton disabled={blockSubmit} pending={isPending} />
     </form>
   );
 }

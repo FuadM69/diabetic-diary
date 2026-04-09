@@ -25,6 +25,14 @@ export type UserSettings = {
   glucose_target_max: number;
   carb_ratio: number | null;
   insulin_sensitivity: number | null;
+  carb_ratio_morning?: number | null;
+  carb_ratio_day?: number | null;
+  carb_ratio_evening?: number | null;
+  carb_ratio_night?: number | null;
+  insulin_sensitivity_morning?: number | null;
+  insulin_sensitivity_day?: number | null;
+  insulin_sensitivity_evening?: number | null;
+  insulin_sensitivity_night?: number | null;
   timezone: string | null;
 };
 

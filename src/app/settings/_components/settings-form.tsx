@@ -16,7 +16,7 @@ import {
 const initial: SettingsActionResult = { success: false, error: null };
 
 const inputClass =
-  "mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none placeholder:text-white/40 focus:border-white/30 disabled:opacity-60";
+  "mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-base text-white outline-none placeholder:text-white/40 focus:border-white/30 disabled:opacity-60";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -50,6 +50,38 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
   const isensStr =
     initialSettings.insulin_sensitivity != null
       ? String(initialSettings.insulin_sensitivity)
+      : "";
+  const carbMorningStr =
+    initialSettings.carb_ratio_morning != null
+      ? String(initialSettings.carb_ratio_morning)
+      : "";
+  const carbDayStr =
+    initialSettings.carb_ratio_day != null
+      ? String(initialSettings.carb_ratio_day)
+      : "";
+  const carbEveningStr =
+    initialSettings.carb_ratio_evening != null
+      ? String(initialSettings.carb_ratio_evening)
+      : "";
+  const carbNightStr =
+    initialSettings.carb_ratio_night != null
+      ? String(initialSettings.carb_ratio_night)
+      : "";
+  const isensMorningStr =
+    initialSettings.insulin_sensitivity_morning != null
+      ? String(initialSettings.insulin_sensitivity_morning)
+      : "";
+  const isensDayStr =
+    initialSettings.insulin_sensitivity_day != null
+      ? String(initialSettings.insulin_sensitivity_day)
+      : "";
+  const isensEveningStr =
+    initialSettings.insulin_sensitivity_evening != null
+      ? String(initialSettings.insulin_sensitivity_evening)
+      : "";
+  const isensNightStr =
+    initialSettings.insulin_sensitivity_night != null
+      ? String(initialSettings.insulin_sensitivity_night)
       : "";
   const tzStr = initialSettings.timezone ?? "";
 
@@ -93,38 +125,185 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
       <section className={SURFACE_CARD}>
         <h2 className="text-base font-medium text-white">Помощник болюса</h2>
         <p className="mt-1 text-xs leading-relaxed text-white/50">
-          Оба поля нужны для оценки болюса на странице «Болюс»: коэффициент —
-          сколько г углеводов «покрывает» 1 ед. инсулина; чувствительность — на
-          сколько единиц снижает глюкозу на 1 единицу в ваших единицах. Это
-          личные значения от врача или опыта; можно оставить пустым, если
-          расчёт не используете.
+          Для базовой работы помощника нужны 2 поля ниже: общий УК и общая
+          чувствительность. Блоки по времени суток — необязательные уточнения.
         </p>
-        <label className="mt-4 block text-sm text-white/70">
-          Углеводный коэффициент (г / 1 ед.)
-          <input
-            name="carb_ratio"
-            type="number"
-            inputMode="decimal"
-            step="0.1"
-            disabled={isPending}
-            placeholder="например, 12"
-            defaultValue={carbStr}
-            className={inputClass}
-          />
-        </label>
-        <label className="mt-4 block text-sm text-white/70">
-          Чувствительность (снижение глюкозы на 1 ед.)
-          <input
-            name="insulin_sensitivity"
-            type="number"
-            inputMode="decimal"
-            step="0.1"
-            disabled={isPending}
-            placeholder="например, 2"
-            defaultValue={isensStr}
-            className={inputClass}
-          />
-        </label>
+        <div className="mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-emerald-100/90">
+            Базовые значения (рекомендуется заполнить)
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="block text-sm text-white/70">
+              Общий УК (г / 1 ед.)
+              <input
+                name="carb_ratio"
+                type="number"
+                inputMode="decimal"
+                step="0.1"
+                disabled={isPending}
+                placeholder="например, 12"
+                defaultValue={carbStr}
+                className={inputClass}
+              />
+            </label>
+            <label className="block text-sm text-white/70">
+              Общая чувствительность
+              <input
+                name="insulin_sensitivity"
+                type="number"
+                inputMode="decimal"
+                step="0.1"
+                disabled={isPending}
+                placeholder="например, 2"
+                defaultValue={isensStr}
+                className={inputClass}
+              />
+            </label>
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-emerald-100/80">
+            Эти поля используются как fallback для всех блоков времени, где
+            локальные значения не заданы.
+          </p>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-white/55">
+            По времени суток (необязательно)
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-white/45">
+            Заполняйте только если коэффициенты реально отличаются по времени.
+            Пустые поля автоматически берут общий fallback выше.
+          </p>
+          <div className="mt-3 space-y-3">
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-white/55">
+                Утро · 06:00-11:59
+              </p>
+              <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                <label className="block text-sm text-white/70">
+                  УК
+                  <input
+                    name="carb_ratio_morning"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.1"
+                    disabled={isPending}
+                    defaultValue={carbMorningStr}
+                    className={inputClass}
+                  />
+                </label>
+                <label className="block text-sm text-white/70">
+                  Чувствительность
+                  <input
+                    name="insulin_sensitivity_morning"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.1"
+                    disabled={isPending}
+                    defaultValue={isensMorningStr}
+                    className={inputClass}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-white/55">
+                День · 12:00-17:59
+              </p>
+              <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                <label className="block text-sm text-white/70">
+                  УК
+                  <input
+                    name="carb_ratio_day"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.1"
+                    disabled={isPending}
+                    defaultValue={carbDayStr}
+                    className={inputClass}
+                  />
+                </label>
+                <label className="block text-sm text-white/70">
+                  Чувствительность
+                  <input
+                    name="insulin_sensitivity_day"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.1"
+                    disabled={isPending}
+                    defaultValue={isensDayStr}
+                    className={inputClass}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-white/55">
+                Вечер · 18:00-23:59
+              </p>
+              <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                <label className="block text-sm text-white/70">
+                  УК
+                  <input
+                    name="carb_ratio_evening"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.1"
+                    disabled={isPending}
+                    defaultValue={carbEveningStr}
+                    className={inputClass}
+                  />
+                </label>
+                <label className="block text-sm text-white/70">
+                  Чувствительность
+                  <input
+                    name="insulin_sensitivity_evening"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.1"
+                    disabled={isPending}
+                    defaultValue={isensEveningStr}
+                    className={inputClass}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-white/55">
+                Ночь · 00:00-05:59
+              </p>
+              <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                <label className="block text-sm text-white/70">
+                  УК
+                  <input
+                    name="carb_ratio_night"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.1"
+                    disabled={isPending}
+                    defaultValue={carbNightStr}
+                    className={inputClass}
+                  />
+                </label>
+                <label className="block text-sm text-white/70">
+                  Чувствительность
+                  <input
+                    name="insulin_sensitivity_night"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.1"
+                    disabled={isPending}
+                    defaultValue={isensNightStr}
+                    className={inputClass}
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section className={SURFACE_CARD}>

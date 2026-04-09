@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import type { BolusMealContext, BolusRecentMealOption } from "@/lib/types/bolus";
+import type {
+  BolusGlucoseSuggestion,
+  BolusMealContext,
+  BolusRecentMealOption,
+} from "@/lib/types/bolus";
 import type { UserSettings } from "@/lib/types/glucose";
 import type { BolusEstimate } from "@/lib/utils/bolus";
 import { computeBolusEstimate } from "@/lib/utils/bolus";
@@ -12,6 +16,7 @@ import {
   bolusSettingsMissingMessage,
   bolusSettingsReady,
   parseBolusHelperInput,
+  resolveBolusSettingsForTime,
 } from "@/lib/utils/bolus-form";
 import { formatGlucoseDate } from "@/lib/utils/glucose";
 import { BolusResultCard } from "./bolus-result-card";
@@ -28,9 +33,33 @@ type BolusFormProps = {
   initialMealContext: BolusMealContext | null;
   /** True when URL had `mealId` but the row was not found. */
   linkedMealMissing: boolean;
-  latestGlucose: number | null;
-  latestGlucoseMeasuredAt: string | null;
+  /**
+   * UTC ISO: meal `eaten_at` (DB or `mealTime` query). When set, glucose hints may only use
+   * journal readings with `measured_at <=` this instant — never later “latest” values.
+   */
+  mealGlucoseReferenceIso: string | null;
+  /** Initial glucose prefill / chip target: at-or-before meal when in meal context, else latest global. */
+  defaultGlucoseSuggestion: BolusGlucoseSuggestion | null;
 };
+
+/** Drop any suggestion incompatible with the meal reference (ISO timestamps compare lexicographically). */
+function glucoseSuggestionAllowed(
+  s: BolusGlucoseSuggestion | null,
+  mealRefIso: string | null
+): BolusGlucoseSuggestion | null {
+  if (!s) {
+    return null;
+  }
+  if (mealRefIso) {
+    if (s.scope === "latest_global") {
+      return null;
+    }
+    if (s.measuredAt > mealRefIso) {
+      return null;
+    }
+  }
+  return s;
+}
 
 function recentOptionToContext(m: BolusRecentMealOption): BolusMealContext {
   return {
@@ -40,12 +69,23 @@ function recentOptionToContext(m: BolusRecentMealOption): BolusMealContext {
   };
 }
 
-function toComputeSettings(s: UserSettings) {
+function suggestionFromRecentOption(
+  m: BolusRecentMealOption
+): BolusGlucoseSuggestion | null {
+  if (
+    m.suggestGlucoseValue == null ||
+    !Number.isFinite(m.suggestGlucoseValue) ||
+    !m.suggestGlucoseMeasuredAt
+  ) {
+    return null;
+  }
+  if (m.suggestGlucoseMeasuredAt > m.eatenAt) {
+    return null;
+  }
   return {
-    glucose_target_min: s.glucose_target_min,
-    glucose_target_max: s.glucose_target_max,
-    carb_ratio: s.carb_ratio!,
-    insulin_sensitivity: s.insulin_sensitivity!,
+    value: m.suggestGlucoseValue,
+    measuredAt: m.suggestGlucoseMeasuredAt,
+    scope: "at_or_before_meal",
   };
 }
 
@@ -55,8 +95,8 @@ export function BolusForm({
   urlPrefill,
   initialMealContext,
   linkedMealMissing,
-  latestGlucose,
-  latestGlucoseMeasuredAt,
+  mealGlucoseReferenceIso,
+  defaultGlucoseSuggestion,
 }: BolusFormProps) {
   const ready = useMemo(() => bolusSettingsReady(settings), [settings]);
 
@@ -64,28 +104,47 @@ export function BolusForm({
     BolusMealContext | null
   >(() => initialMealContext);
 
+  const [mealRefIso, setMealRefIso] = useState<string | null>(
+    () => mealGlucoseReferenceIso
+  );
+
   const [insulinLinkedMealId, setInsulinLinkedMealId] = useState<
     string | null
   >(() => (linkedMealMissing ? null : urlPrefill.linkedMealId));
+
+  const [activeGlucoseSuggestion, setActiveGlucoseSuggestion] = useState<
+    BolusGlucoseSuggestion | null
+  >(() =>
+    glucoseSuggestionAllowed(defaultGlucoseSuggestion, mealGlucoseReferenceIso)
+  );
 
   const [carbs, setCarbs] = useState(() => urlPrefill.carbs);
   const [glucose, setGlucose] = useState(() => {
     if (urlPrefill.glucose.length > 0) {
       return urlPrefill.glucose;
     }
-    if (latestGlucose != null && Number.isFinite(latestGlucose)) {
-      return String(latestGlucose);
+    const allowed = glucoseSuggestionAllowed(
+      defaultGlucoseSuggestion,
+      mealGlucoseReferenceIso
+    );
+    if (allowed != null && Number.isFinite(allowed.value)) {
+      return String(allowed.value);
     }
     return "";
   });
   const [estimate, setEstimate] = useState<BolusEstimate | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const resolvedForActiveTime = useMemo(
+    () => resolveBolusSettingsForTime(settings, mealRefIso),
+    [settings, mealRefIso]
+  );
+  const readyForActiveTime = resolvedForActiveTime.ready;
 
   const handleEstimate = () => {
     setError(null);
     setEstimate(null);
 
-    if (!ready) {
+    if (!readyForActiveTime) {
       setError(bolusSettingsMissingMessage());
       return;
     }
@@ -100,7 +159,12 @@ export function BolusForm({
       computeBolusEstimate({
         carbs: parsed.data.carbs,
         current_glucose: parsed.data.current_glucose,
-        settings: toComputeSettings(settings),
+        settings: {
+          glucose_target_min: settings.glucose_target_min,
+          glucose_target_max: settings.glucose_target_max,
+          carb_ratio: resolvedForActiveTime.carbRatio!,
+          insulin_sensitivity: resolvedForActiveTime.insulinSensitivity!,
+        },
       })
     );
   };
@@ -152,6 +216,36 @@ export function BolusForm({
       ) : null}
 
       <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4 space-y-4">
+        <div
+          className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-xs text-white/70"
+          role="status"
+        >
+          <p>
+            Активный блок коэффициентов:{" "}
+            <span className="font-medium text-white">
+              {resolvedForActiveTime.blockLabel}
+            </span>
+            .
+          </p>
+          <p className="mt-1 tabular-nums text-white/80">
+            УК:{" "}
+            {resolvedForActiveTime.carbRatio != null ?
+              resolvedForActiveTime.carbRatio
+            : "—"}
+            {" · "}Чувствительность:{" "}
+            {resolvedForActiveTime.insulinSensitivity != null ?
+              resolvedForActiveTime.insulinSensitivity
+            : "—"}
+          </p>
+          {resolvedForActiveTime.usesFallbackCarbRatio ||
+          resolvedForActiveTime.usesFallbackSensitivity ? (
+            <p className="mt-1 text-white/50">
+              Для этого блока часть значений не заполнена — использованы базовые
+              из «Настроек».
+            </p>
+          ) : null}
+        </div>
+
         <div className="space-y-2">
           {mealContextDisplay ? (
             <>
@@ -212,6 +306,26 @@ export function BolusForm({
           )}
         </div>
 
+        {mealRefIso ? (
+          <div
+            className="rounded-2xl border border-sky-500/30 bg-sky-950/20 px-3 py-3 text-xs leading-relaxed text-white/80"
+            role="note"
+          >
+            <p className="font-medium text-sky-100/95">
+              Время приёма для правила глюкозы
+            </p>
+            <p className="mt-0.5 tabular-nums text-white">
+              {formatGlucoseDate(mealRefIso)}
+            </p>
+            <p className="mt-2 text-white/55">
+              Помощник предлагает только замеры из журнала глюкозы{" "}
+              <span className="text-white/75">на этот момент или раньше</span>.
+              Более поздние замеры (включая «сейчас») не подставляются
+              автоматически.
+            </p>
+          </div>
+        ) : null}
+
         {recentMeals.length > 0 ? (
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-white/45">
@@ -228,7 +342,14 @@ export function BolusForm({
                   onClick={() => {
                     setMealContextDisplay(recentOptionToContext(m));
                     setInsulinLinkedMealId(m.id);
+                    setMealRefIso(m.eatenAt);
                     setCarbs(String(m.totalCarbs));
+                    const gRaw = suggestionFromRecentOption(m);
+                    const g = glucoseSuggestionAllowed(gRaw, m.eatenAt);
+                    setActiveGlucoseSuggestion(g);
+                    setGlucose(
+                      g != null && Number.isFinite(g.value) ? String(g.value) : ""
+                    );
                     clearResult();
                   }}
                   className="shrink-0 rounded-2xl border border-white/15 bg-white/[0.06] px-3 py-2 text-left text-xs text-white/85 transition-colors hover:border-white/25 hover:bg-white/[0.09]"
@@ -245,23 +366,49 @@ export function BolusForm({
           </div>
         ) : null}
 
-        {latestGlucose != null && Number.isFinite(latestGlucose) ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setGlucose(String(latestGlucose));
-                clearResult();
-              }}
-              className="rounded-2xl border border-white/15 bg-white/[0.06] px-3 py-2 text-xs text-white/85 hover:border-white/25"
-            >
-              Подставить последнюю глюкозу: {latestGlucose}
-              {latestGlucoseMeasuredAt ? (
-                <span className="ml-1 text-white/45">
-                  ({formatGlucoseDate(latestGlucoseMeasuredAt)})
+        {mealRefIso != null && !activeGlucoseSuggestion ? (
+          <p className="text-xs leading-relaxed text-amber-100/85" role="status">
+            До времени приёма ({formatGlucoseDate(mealRefIso)}) в журнале нет
+            замера глюкозы — подставить нечего. Введите значение вручную.
+          </p>
+        ) : null}
+
+        {activeGlucoseSuggestion != null &&
+        Number.isFinite(activeGlucoseSuggestion.value) ? (
+          <div className="space-y-2">
+            <p className="text-xs text-white/55" role="status">
+              {mealRefIso ?
+                <>
+                  Предлагаемый замер для этого приёма:{" "}
+                  <span className="tabular-nums font-medium text-white">
+                    {activeGlucoseSuggestion.value}
+                  </span>{" "}
+                  ({formatGlucoseDate(activeGlucoseSuggestion.measuredAt)}) — не
+                  позже времени приёма.
+                </>
+              : <>
+                  Предлагаемый замер (последний в журнале):{" "}
+                  <span className="tabular-nums font-medium text-white">
+                    {activeGlucoseSuggestion.value}
+                  </span>{" "}
+                  ({formatGlucoseDate(activeGlucoseSuggestion.measuredAt)}).
+                </>}
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setGlucose(String(activeGlucoseSuggestion.value));
+                  clearResult();
+                }}
+                className="rounded-2xl border border-white/15 bg-white/[0.06] px-3 py-2 text-left text-xs text-white/85 hover:border-white/25"
+              >
+                Подставить в поле:{" "}
+                <span className="tabular-nums font-medium text-white">
+                  {activeGlucoseSuggestion.value}
                 </span>
-              ) : null}
-            </button>
+              </button>
+            </div>
           </div>
         ) : null}
 
@@ -298,7 +445,7 @@ export function BolusForm({
               clearResult();
             }}
             disabled={!ready}
-            placeholder="замер сейчас"
+            placeholder={mealRefIso ? "глюкоза на момент приёма" : "замер"}
             className={inputClass}
           />
         </label>
@@ -306,7 +453,7 @@ export function BolusForm({
         <button
           type="button"
           onClick={handleEstimate}
-          disabled={!ready}
+          disabled={!readyForActiveTime}
           className="w-full rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black disabled:cursor-not-allowed disabled:opacity-50"
         >
           Показать оценку

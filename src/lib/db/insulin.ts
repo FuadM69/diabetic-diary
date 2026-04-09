@@ -2,7 +2,7 @@
  * Insulin entries — **RLS:** `user_id = auth.uid()` for all operations.
  */
 import { createClient } from "@/lib/supabase/server";
-import type { InsulinEntry } from "@/lib/types/insulin";
+import type { InsulinEntry, InsulinEntryType } from "@/lib/types/insulin";
 import type {
   InsulinFormParsed,
   InsulinUpdateFormParsed,
@@ -27,6 +27,8 @@ function mapInsulinRow(row: InsulinEntry): InsulinEntry {
 export type GetInsulinEntriesOptions = {
   /** Inclusive lower bound on `taken_at` (ISO). Omit or `null` = no date filter. */
   takenAtGte?: string | null;
+  /** Optional type filter (e.g. only `bolus` for meal-link lookup). */
+  entryTypes?: InsulinEntryType[];
 };
 
 const INSULIN_SELECT =
@@ -57,6 +59,10 @@ export async function getInsulinEntries(
     const from = options?.takenAtGte;
     if (typeof from === "string" && from.length > 0) {
       q = q.gte("taken_at", from);
+    }
+    const entryTypes = options?.entryTypes;
+    if (Array.isArray(entryTypes) && entryTypes.length > 0) {
+      q = q.in("entry_type", entryTypes);
     }
 
     const { data, error } = await q

@@ -47,6 +47,7 @@ export async function updateUserSettingsAction(
   }
 
   revalidatePath("/");
+  revalidatePath("/bolus");
   revalidatePath("/glucose");
   revalidatePath("/settings");
 

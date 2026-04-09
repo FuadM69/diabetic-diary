@@ -89,7 +89,7 @@ export default async function GlucosePage({ searchParams }: GlucosePageProps) {
           className={`${SURFACE_CARD} scroll-mt-24`}
           aria-label="Добавить запись глюкозы"
         >
-          <GlucoseForm formKey={`${entries.length}|${range}`} />
+          <GlucoseForm formKey={`${entries.length}|${range}`} settings={settings} />
         </section>
 
         <section className="space-y-3">
@@ -116,7 +116,12 @@ export default async function GlucosePage({ searchParams }: GlucosePageProps) {
 
         <section className="space-y-3">
           <h2 className={SECTION_TITLE}>Последние значения</h2>
-          <GlucoseList entries={entries} settings={settings} range={range} />
+          <GlucoseList
+            entries={entries}
+            settings={settings}
+            range={range}
+            userTimezone={settings.timezone}
+          />
         </section>
       </div>
     </AppShell>

@@ -74,7 +74,7 @@ function EditFormBody({
           inputMode="decimal"
           defaultValue={entry.glucose_value}
           disabled={isPending}
-          className="mt-2 w-full rounded-2xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none focus:border-white/35 disabled:opacity-60"
+          className="mt-2 w-full rounded-2xl border border-white/15 bg-black/50 px-4 py-3 text-base text-white outline-none focus:border-white/35 disabled:opacity-60"
         />
       </div>
       <div>
@@ -90,7 +90,7 @@ function EditFormBody({
           type="datetime-local"
           defaultValue={formatDatetimeLocalFromIso(entry.measured_at)}
           disabled={isPending}
-          className="mt-2 w-full rounded-2xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none focus:border-white/35 disabled:opacity-60 [color-scheme:dark]"
+          className="mt-2 w-full rounded-2xl border border-white/15 bg-black/50 px-4 py-3 text-base text-white outline-none focus:border-white/35 disabled:opacity-60 [color-scheme:dark]"
         />
       </div>
       <label htmlFor={`glucose-edit-note-${entry.id}`} className="block text-sm text-white/70">
@@ -102,7 +102,7 @@ function EditFormBody({
           rows={2}
           defaultValue={entry.note ?? ""}
           disabled={isPending}
-          className="mt-2 w-full resize-none rounded-2xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none focus:border-white/35 disabled:opacity-60"
+          className="mt-2 w-full resize-none rounded-2xl border border-white/15 bg-black/50 px-4 py-3 text-base text-white outline-none focus:border-white/35 disabled:opacity-60"
         />
       </label>
       {state.error ? (

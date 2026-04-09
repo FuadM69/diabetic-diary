@@ -14,6 +14,10 @@ import {
   type FoodActionResult,
 } from "../actions";
 import { FEEDBACK_ERROR, FEEDBACK_SUCCESS } from "@/lib/ui/page-patterns";
+import {
+  getDisplayProductName,
+  isDrinkProduct,
+} from "@/lib/utils/food-product-kind";
 
 const initialState: FoodActionResult = {
   success: false,
@@ -21,7 +25,7 @@ const initialState: FoodActionResult = {
 };
 
 const inputClass =
-  "mt-2 w-full rounded-2xl border border-white/15 bg-black/50 px-4 py-3 text-white outline-none placeholder:text-white/40 focus:border-white/35 disabled:opacity-60";
+  "mt-2 w-full rounded-2xl border border-white/15 bg-black/50 px-4 py-3 text-base text-white outline-none placeholder:text-white/40 focus:border-white/35 disabled:opacity-60";
 
 function SaveButton() {
   const { pending } = useFormStatus();
@@ -45,6 +49,7 @@ function EditFormBody({
   onSuccess: () => void;
   onCancel: () => void;
 }) {
+  const drink = isDrinkProduct(product);
   const [state, formAction, isPending] = useActionState(
     async (_prev: FoodActionResult, formData: FormData) =>
       updateFoodProductAction(formData),
@@ -71,9 +76,21 @@ function EditFormBody({
           type="text"
           required
           disabled={isPending}
-          defaultValue={product.name}
+          defaultValue={getDisplayProductName(product.name)}
           className={inputClass}
         />
+      </label>
+
+      <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/75">
+        <input
+          type="checkbox"
+          name="is_drink"
+          value="1"
+          defaultChecked={drink}
+          disabled={isPending}
+          className="size-4 accent-white"
+        />
+        Это напиток (показывать в разделе напитков)
       </label>
 
       <label className="block text-sm text-white/70">
@@ -90,7 +107,7 @@ function EditFormBody({
 
       <div className="grid grid-cols-2 gap-3">
         <label className="block text-sm text-white/70">
-          Углеводы (г) *
+          Углеводы ({drink ? "г/100 мл" : "г"}) *
           <input
             name="carbs_per_100g"
             type="number"
@@ -104,7 +121,7 @@ function EditFormBody({
           />
         </label>
         <label className="block text-sm text-white/70">
-          Ккал *
+          Ккал {drink ? "/100 мл" : ""} *
           <input
             name="calories_per_100g"
             type="number"
@@ -118,7 +135,7 @@ function EditFormBody({
           />
         </label>
         <label className="block text-sm text-white/70">
-          Белки (г) *
+          Белки ({drink ? "г/100 мл" : "г"}) *
           <input
             name="protein_per_100g"
             type="number"
@@ -132,7 +149,7 @@ function EditFormBody({
           />
         </label>
         <label className="block text-sm text-white/70">
-          Жиры (г) *
+          Жиры ({drink ? "г/100 мл" : "г"}) *
           <input
             name="fat_per_100g"
             type="number"

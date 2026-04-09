@@ -129,7 +129,7 @@ export default function CalculatorPage() {
   };
 
   const inputClassName =
-    "mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none placeholder:text-white/40 focus:border-white/30";
+    "mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-base text-white outline-none placeholder:text-white/40 focus:border-white/30";
 
   return (
     <AppShell title="Расчет дозы">

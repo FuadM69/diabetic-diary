@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { FoodProduct } from "@/lib/types/food";
 import type { MealEntryWithItems } from "@/lib/types/meal";
 import { MEAL_TYPE_LABEL_RU } from "@/lib/types/meal";
+import { formatUtcIsoForUserDisplay } from "@/lib/utils/datetime-local-tz";
+import { getDisplayProductName } from "@/lib/utils/food-product-kind";
 import {
   sumCaloriesFromItems,
   sumCarbsFromItems,
@@ -9,23 +11,19 @@ import {
 import { DeleteMealButton } from "./delete-meal-button";
 import { EditMealDialog } from "./edit-meal-dialog";
 
-function formatEatenAt(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) {
-    return iso;
-  }
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(d);
-}
-
 type MealCardProps = {
   meal: MealEntryWithItems;
   products: FoodProduct[];
+  userTimezone: string | null;
+  linkedBolusUnits?: number | null;
 };
 
-export function MealCard({ meal, products }: MealCardProps) {
+export function MealCard({
+  meal,
+  products,
+  userTimezone,
+  linkedBolusUnits = null,
+}: MealCardProps) {
   const typeLabel =
     meal.meal_type in MEAL_TYPE_LABEL_RU
       ? MEAL_TYPE_LABEL_RU[meal.meal_type as keyof typeof MEAL_TYPE_LABEL_RU]
@@ -37,6 +35,7 @@ export function MealCard({ meal, products }: MealCardProps) {
   const bolusHref = `/bolus?${new URLSearchParams({
     carbs: String(carbs),
     mealId: meal.id,
+    mealTime: meal.eaten_at,
   }).toString()}`;
 
   return (
@@ -46,7 +45,14 @@ export function MealCard({ meal, products }: MealCardProps) {
           <p className="text-xs font-medium uppercase tracking-wide text-white/45">
             {typeLabel}
           </p>
-          <p className="mt-1 text-sm text-white/70">{formatEatenAt(meal.eaten_at)}</p>
+          <p className="mt-1 text-sm text-white/70">
+            {formatUtcIsoForUserDisplay(meal.eaten_at, userTimezone, {
+              dateStyle: "medium",
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            })}
+          </p>
         </div>
         <div className="text-right">
           <p className="tabular-nums text-lg font-semibold text-white">
@@ -54,6 +60,15 @@ export function MealCard({ meal, products }: MealCardProps) {
             <span className="ml-1 text-xs font-normal text-white/45">г УДВ</span>
           </p>
           <p className="tabular-nums text-sm text-white/55">{kcal} ккал</p>
+          {linkedBolusUnits != null ? (
+            <p className="mt-1 text-xs text-emerald-200/90">
+              Факт болюса:{" "}
+              <span className="tabular-nums font-medium text-emerald-100">
+                {linkedBolusUnits}
+              </span>{" "}
+              ед.
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -70,7 +85,7 @@ export function MealCard({ meal, products }: MealCardProps) {
             className="flex flex-wrap items-baseline justify-between gap-2 text-sm"
           >
             <span className="text-white/80">
-              {it.productName}
+              {getDisplayProductName(it.productName)}
               {it.productBrand ? (
                 <span className="text-white/45"> · {it.productBrand}</span>
               ) : null}

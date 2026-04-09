@@ -1,8 +1,6 @@
 import type { GlucoseEntry, GlucoseStatus } from "@/lib/types/glucose";
-import {
-  formatGlucoseDate,
-  formatGlucoseValue,
-} from "@/lib/utils/glucose";
+import { formatUtcIsoForUserDisplay } from "@/lib/utils/datetime-local-tz";
+import { formatGlucoseValue } from "@/lib/utils/glucose";
 import { DeleteGlucoseButton } from "./delete-glucose-button";
 import { EditGlucoseDialog } from "./edit-glucose-dialog";
 
@@ -30,9 +28,10 @@ const STATUS_PRESENTATION: Record<
 type GlucoseCardProps = {
   entry: GlucoseEntry;
   status: GlucoseStatus;
+  userTimezone: string | null;
 };
 
-export function GlucoseCard({ entry, status }: GlucoseCardProps) {
+export function GlucoseCard({ entry, status, userTimezone }: GlucoseCardProps) {
   const ui = STATUS_PRESENTATION[status];
 
   return (
@@ -43,7 +42,12 @@ export function GlucoseCard({ entry, status }: GlucoseCardProps) {
             {formatGlucoseValue(entry.glucose_value)}
           </p>
           <p className="mt-1 text-sm text-white/55">
-            {formatGlucoseDate(entry.measured_at)}
+            {formatUtcIsoForUserDisplay(entry.measured_at, userTimezone, {
+              dateStyle: "medium",
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            })}
           </p>
           {entry.note ? (
             <p className="mt-1 line-clamp-2 text-xs text-white/50">{entry.note}</p>

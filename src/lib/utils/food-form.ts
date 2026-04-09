@@ -1,4 +1,5 @@
 import type { FoodProductInsert, FoodProductUpdate } from "@/lib/types/food";
+import { withDrinkMarker } from "@/lib/utils/food-product-kind";
 
 export type ParseFoodProductFormResult =
   | { ok: true; data: FoodProductInsert }
@@ -135,10 +136,19 @@ export function parseFoodProductForm(
     return { ok: false, message: fatP.message };
   }
 
+  const isDrink = formData.get("is_drink") === "1";
+  const normalizedName = withDrinkMarker(nameP.value, isDrink);
+  if (normalizedName.length > NAME_MAX) {
+    return {
+      ok: false,
+      message: `Название слишком длинное (макс. ${NAME_MAX} символов).`,
+    };
+  }
+
   return {
     ok: true,
     data: {
-      name: nameP.value,
+      name: normalizedName,
       brand: brandP.value,
       carbs_per_100g: carbsP.value,
       calories_per_100g: calP.value,

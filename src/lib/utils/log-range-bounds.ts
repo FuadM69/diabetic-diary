@@ -7,7 +7,9 @@
  * **Saved values like `UTC+3` / `GMT+3` are not valid IANA IDs for `Intl`** on Node/V8; we map them
  * to fixed-offset `Etc/GMT±N` (see `tryMapUtcOffsetLabelToIana`).
  *
- * Rolling windows **7d / 14d / 30d** stay as UTC ms offsets from `now` (unchanged).
+ * Rolling-style **7d / 14d / 30d** use the user’s zoned **calendar date**: lower bound is
+ * start of the day that is N **full calendar days** before today in `timezone` (not
+ * `now - N×24h`, which hid same-day morning entries at the window edge).
  */
 import type { GlucoseRangeKey } from "@/lib/types/glucose";
 
@@ -236,6 +238,22 @@ export function resolveLogRangeTimeZone(
 }
 
 /**
+ * Start of the zoned calendar day for `(wall Y-M-D in timeZone) - calendarDaysBack` days
+ * (Gregorian calendar arithmetic on the user’s local date, then start-of-day in `timeZone`).
+ */
+export function startOfZonedCalendarDayUtcMinusCalendarDays(
+  now: Date,
+  timeZone: string,
+  calendarDaysBack: number
+): Date {
+  const w = readZonedWallClockParts(now, timeZone);
+  const anchor = new Date(
+    Date.UTC(w.year, w.month - 1, w.day - calendarDaysBack, 12, 0, 0, 0)
+  );
+  return startOfZonedCalendarDayUtc(anchor, timeZone);
+}
+
+/**
  * Inclusive lower bound for timestamp columns (ISO UTC), or `null` for `"all"`.
  */
 export function getLogRangeMeasuredAtLowerBound(
@@ -254,8 +272,8 @@ export function getLogRangeMeasuredAtLowerBound(
   }
 
   const days = range === "7d" ? 7 : range === "14d" ? 14 : 30;
-  const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-  return cutoff.toISOString();
+  const tz = resolveLogRangeTimeZone(options?.timezone ?? null);
+  return startOfZonedCalendarDayUtcMinusCalendarDays(now, tz, days).toISOString();
 }
 
 export type LogRangeDebugPayload = {
