@@ -19,7 +19,7 @@ const initial: MealActionResult = {
 };
 
 const fieldClass =
-  "w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-base text-white outline-none placeholder:text-white/40 focus:border-white/30 disabled:opacity-60";
+  "box-border w-full min-w-0 max-w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-base text-white outline-none placeholder:text-white/40 focus:border-white/30 disabled:opacity-60";
 
 const bolusLinkClass =
   "inline-flex w-full items-center justify-center rounded-2xl bg-white px-4 py-3 text-center text-sm font-medium text-black transition-opacity hover:opacity-90 sm:w-auto";
@@ -224,25 +224,27 @@ export function MealForm({
       key={formKey}
       ref={formRef}
       action={formAction}
-      className="space-y-5"
+      className="min-w-0 max-w-full space-y-5"
       onInput={syncDraftFromForm}
       onChange={syncDraftFromForm}
     >
-      <div className="space-y-2">
+      <div className="min-w-0 space-y-2">
         <label htmlFor={eatenId} className="block text-sm text-white/70">
           Когда съедено
         </label>
-        <input
-          id={eatenId}
-          name="eaten_at"
-          type="datetime-local"
-          required={!blockSubmit}
-          value={eatenAt}
-          onChange={(e) => setEatenAt(e.target.value)}
-          disabled={isPending || blockSubmit}
-          className={`${fieldClass} min-w-0 w-full max-w-full [color-scheme:dark]`}
-        />
-        <p className="text-[0.7rem] leading-snug text-white/45">
+        <div className="min-w-0 max-w-full">
+          <input
+            id={eatenId}
+            name="eaten_at"
+            type="datetime-local"
+            required={!blockSubmit}
+            value={eatenAt}
+            onChange={(e) => setEatenAt(e.target.value)}
+            disabled={isPending || blockSubmit}
+            className={`${fieldClass} [color-scheme:dark]`}
+          />
+        </div>
+        <p className="break-words text-[0.7rem] leading-snug text-white/45">
           {eatenAtTzCaption}
         </p>
         {timezoneConfigError ? (
@@ -252,7 +254,7 @@ export function MealForm({
         ) : null}
       </div>
 
-      <div className="space-y-2">
+      <div className="min-w-0 space-y-2">
         <label htmlFor={mealTypeId} className="block text-sm text-white/70">
           Тип приёма
         </label>
@@ -273,7 +275,7 @@ export function MealForm({
         </select>
       </div>
 
-      <div className="space-y-2">
+      <div className="min-w-0 space-y-2">
         <label htmlFor={noteId} className="block text-sm text-white/70">
           Комментарий
         </label>
@@ -303,10 +305,10 @@ export function MealForm({
 
       {showBolusNext && bolusHref ? (
         <div
-          className="space-y-3 rounded-2xl border border-emerald-500/35 bg-emerald-950/25 p-4"
+          className="min-w-0 space-y-3 rounded-2xl border border-emerald-500/35 bg-emerald-950/25 p-4"
           role="status"
         >
-          <p className="text-sm leading-relaxed text-white/85">
+          <p className="break-words text-sm leading-relaxed text-white/85">
             Приём пищи сохранён. В помощнике болюса уже подставлены углеводы (
             <span className="tabular-nums text-white">
               {state.createdTotalCarbs} г
@@ -315,7 +317,7 @@ export function MealForm({
             позже времени приёма) и проверьте дозу перед введением — приложение
             не записывает инсулин за вас.
           </p>
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap">
             <Link href={bolusHref} className={bolusLinkClass} prefetch={false}>
               Рассчитать болюс
             </Link>
@@ -328,7 +330,7 @@ export function MealForm({
 
       <SubmitButton formDisabled={blockSubmit} />
 
-      <details className="rounded-2xl border border-white/10 bg-white/[0.02] px-3 py-2 sm:px-3.5">
+      <details className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.02] px-3 py-2 sm:px-3.5">
         <summary className="cursor-pointer list-none text-xs text-white/50 [&::-webkit-details-marker]:hidden">
           Про болюс и запись инсулина{" "}
           <span className="font-normal text-white/35">▼</span>

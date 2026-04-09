@@ -41,8 +41,8 @@ export default async function MealsPage() {
 
   return (
     <AppShell title="Еда">
-      <div className="mx-auto w-full max-w-lg space-y-3 pb-4 sm:space-y-5">
-        <p className="text-xs leading-snug text-white/60 sm:text-sm sm:leading-relaxed">
+      <div className="mx-auto min-w-0 w-full max-w-full space-y-3 overflow-x-clip pb-4 sm:space-y-5">
+        <p className="min-w-0 break-words text-xs leading-snug text-white/60 sm:text-sm sm:leading-relaxed">
           Приём из <span className="text-white/75">вашего списка</span> продуктов:
           УВ и ккал по граммам порции. Добавляйте и правьте позиции в разделе
           «Продукты».
@@ -50,7 +50,7 @@ export default async function MealsPage() {
 
         <section
           id="add-meal"
-          className={`${SURFACE_CARD} space-y-4 scroll-mt-24`}
+          className={`${SURFACE_CARD} min-w-0 space-y-4 scroll-mt-24`}
           aria-label="Новый приём пищи"
         >
           <h2 className="text-sm font-medium text-white/85">Новый приём пищи</h2>
@@ -65,7 +65,7 @@ export default async function MealsPage() {
           />
         </section>
 
-        <section id="meal-journal" className="scroll-mt-24 space-y-3">
+        <section id="meal-journal" className="min-w-0 scroll-mt-24 space-y-3">
           <h2 className={SECTION_TITLE}>Журнал</h2>
           <MealList
             meals={meals}
