@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import type { GlucoseEntry, GlucoseStats } from "@/lib/types/glucose";
 import { formatUtcIsoForUserDisplay } from "@/lib/utils/datetime-local-tz";
 import { formatGlucoseValue } from "@/lib/utils/glucose";
@@ -7,17 +8,23 @@ type DashboardTodaySectionProps = {
   latest: GlucoseEntry;
   todayStats: GlucoseStats;
   userTimezone: string | null;
+  /** e.g. «Обновить» — над карточками сводки */
+  trailing?: ReactNode;
 };
 
 export function DashboardTodaySection({
   latest,
   todayStats,
   userTimezone,
+  trailing = null,
 }: DashboardTodaySectionProps) {
   const readingsToday = todayStats.isEmpty ? 0 : todayStats.totalCount;
 
   return (
     <section className="space-y-3">
+      {trailing ? (
+        <div className="flex items-center justify-end">{trailing}</div>
+      ) : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-white/45">

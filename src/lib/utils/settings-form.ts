@@ -1,4 +1,5 @@
 import type { UserSettingsUpdatePayload } from "@/lib/db/settings";
+import { isInsulinDoseStep } from "@/lib/utils/insulin-dose-step";
 
 export type ParseSettingsFormResult =
   | { ok: true; data: UserSettingsUpdatePayload }
@@ -101,9 +102,18 @@ export function parseUserSettingsForm(formData: FormData): ParseSettingsFormResu
     };
   }
 
+  const doseStepRaw = formData.get("insulin_dose_step");
+  if (doseStepRaw === null || typeof doseStepRaw !== "string") {
+    return { ok: false, message: "Выберите шаг дозы инсулина." };
+  }
+  const doseStepParsed = Number.parseFloat(doseStepRaw.trim().replace(",", "."));
+  if (!isInsulinDoseStep(doseStepParsed)) {
+    return { ok: false, message: "Недопустимый шаг дозы инсулина." };
+  }
+
   const carbP = parseOptionalPositiveFloat(
     formData.get("carb_ratio"),
-    "Углеводный коэффициент"
+    "УК (г на 1 ед.)"
   );
   if (!carbP.ok) {
     return { ok: false, message: carbP.message };
@@ -111,7 +121,7 @@ export function parseUserSettingsForm(formData: FormData): ParseSettingsFormResu
 
   const isensP = parseOptionalPositiveFloat(
     formData.get("insulin_sensitivity"),
-    "Чувствительность к инсулину"
+    "Фактор коррекции (сдвиг глюкозы на 1 ед.)"
   );
   if (!isensP.ok) {
     return { ok: false, message: isensP.message };
@@ -147,28 +157,28 @@ export function parseUserSettingsForm(formData: FormData): ParseSettingsFormResu
   }
   const isensMorningP = parseOptionalPositiveFloat(
     formData.get("insulin_sensitivity_morning"),
-    "Чувствительность: утро"
+    "Фактор коррекции: утро"
   );
   if (!isensMorningP.ok) {
     return { ok: false, message: isensMorningP.message };
   }
   const isensDayP = parseOptionalPositiveFloat(
     formData.get("insulin_sensitivity_day"),
-    "Чувствительность: день"
+    "Фактор коррекции: день"
   );
   if (!isensDayP.ok) {
     return { ok: false, message: isensDayP.message };
   }
   const isensEveningP = parseOptionalPositiveFloat(
     formData.get("insulin_sensitivity_evening"),
-    "Чувствительность: вечер"
+    "Фактор коррекции: вечер"
   );
   if (!isensEveningP.ok) {
     return { ok: false, message: isensEveningP.message };
   }
   const isensNightP = parseOptionalPositiveFloat(
     formData.get("insulin_sensitivity_night"),
-    "Чувствительность: ночь"
+    "Фактор коррекции: ночь"
   );
   if (!isensNightP.ok) {
     return { ok: false, message: isensNightP.message };
@@ -192,6 +202,7 @@ export function parseUserSettingsForm(formData: FormData): ParseSettingsFormResu
     data: {
       glucose_target_min: minP.value,
       glucose_target_max: maxP.value,
+      insulin_dose_step: doseStepParsed,
       carb_ratio: carbP.value,
       insulin_sensitivity: isensP.value,
       carb_ratio_morning: carbMorningP.value,

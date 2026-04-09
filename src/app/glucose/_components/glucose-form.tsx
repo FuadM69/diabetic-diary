@@ -15,7 +15,12 @@ import {
 } from "../actions";
 import { FEEDBACK_ERROR, FEEDBACK_SUCCESS } from "@/lib/ui/page-patterns";
 import { formatDatetimeLocalValue } from "@/lib/utils/datetime-local";
-import { roundInsulinPrefillUnits } from "@/lib/utils/insulin-form";
+import { buildGlucoseCorrectionInsulinPrefillHref } from "@/lib/utils/bolus-prefill";
+import {
+  formatInsulinDoseStepRu,
+  insulinPrefillUnitsOrFallback,
+} from "@/lib/utils/insulin-dose-step";
+import { formatGlucoseValue } from "@/lib/utils/glucose";
 
 const initialState: GlucoseSubmitResult = {
   success: false,
@@ -77,13 +82,19 @@ export function GlucoseForm({ formKey, settings }: GlucoseFormProps) {
           settings.insulin_sensitivity!
         )
       : 0;
+  const correctionRounded =
+    correctionUnits > 0 ?
+      insulinPrefillUnitsOrFallback(
+        correctionUnits,
+        settings.insulin_dose_step
+      )
+    : 0;
   const correctionPrefillHref =
-    correctionUnits > 0
-      ? `/insulin?${new URLSearchParams({
-          units: String(roundInsulinPrefillUnits(correctionUnits)),
-          entry_type: "correction",
-        }).toString()}#insulin-add`
-      : null;
+    correctionUnits > 0 ?
+      buildGlucoseCorrectionInsulinPrefillHref({
+        roundedUnits: correctionRounded,
+      })
+    : null;
 
   useEffect(() => {
     if (state.success) {
@@ -130,7 +141,7 @@ export function GlucoseForm({ formKey, settings }: GlucoseFormProps) {
           </p>
           {!hasSensitivity ? (
             <p className="mt-1 text-white/70">
-              Не хватает настройки чувствительности к инсулину — откройте{" "}
+              Не задан фактор коррекции (сдвиг глюкозы на 1 ед.) — откройте{" "}
               <Link
                 href="/settings"
                 className="underline decoration-white/30 underline-offset-2"
@@ -141,11 +152,34 @@ export function GlucoseForm({ formKey, settings }: GlucoseFormProps) {
             </p>
           ) : correctionUnits > 0 ? (
             <>
-              <p className="mt-1 text-white/85">
-                Глюкоза выше целевого диапазона. Оценка коррекции:{" "}
-                <span className="tabular-nums font-semibold text-white">
-                  {formatBolusDose(correctionUnits)} ед.
+              <p className="mt-1 text-xs leading-relaxed text-white/55">
+                Цель коррекции — середина вашего диапазона{" "}
+                <span className="tabular-nums text-white/75">
+                  {formatGlucoseValue(settings.glucose_target_min)}–
+                  {formatGlucoseValue(settings.glucose_target_max)}
                 </span>
+                , сейчас для расчёта взято{" "}
+                <span className="tabular-nums font-medium text-white/85">
+                  {formatGlucoseValue(targetGlucose)}
+                </span>
+                .
+              </p>
+              <p className="mt-2 text-white/85">
+                <span className="tabular-nums text-2xl font-semibold text-white">
+                  {formatBolusDose(correctionRounded)} ед.
+                </span>
+                <span className="ml-1 text-sm font-medium text-emerald-200/90">
+                  к вводу
+                </span>
+              </p>
+              <p className="mt-1 tabular-nums text-xs text-white/45">
+                расчёт без округления: {formatBolusDose(correctionUnits)} ед. ·
+                шаг {formatInsulinDoseStepRu(settings.insulin_dose_step)}
+              </p>
+              <p className="mt-1 text-[0.7rem] leading-snug text-white/40">
+                Округление до {formatInsulinDoseStepRu(settings.insulin_dose_step)}{" "}
+                — ближайший шаг на сетке; в форму инсулина подставляется
+                практическая доза.
               </p>
               {correctionPrefillHref ? (
                 <Link

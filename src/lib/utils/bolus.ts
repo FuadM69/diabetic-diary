@@ -114,3 +114,16 @@ export function formatBolusDose(value: number): string {
     minimumFractionDigits: 0,
   }).format(value);
 }
+
+/** Common RU clinic convention: 1 ХЕ ≈ 12 g carbs. */
+export const BREAD_UNIT_GRAMS_TYPICAL_RU = 12;
+
+/** Insulin units per 1 ХЕ when `carbRatio` = g carbs per 1 U. */
+export function insulinUnitsPerTypicalBreadUnit(
+  carbRatio: number
+): string | null {
+  if (!Number.isFinite(carbRatio) || carbRatio <= 0) {
+    return null;
+  }
+  return formatBolusDose(BREAD_UNIT_GRAMS_TYPICAL_RU / carbRatio);
+}

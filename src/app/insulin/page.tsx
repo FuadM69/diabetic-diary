@@ -21,7 +21,6 @@ import { InsulinList } from "./_components/insulin-list";
 import { InsulinFilterHint } from "./_components/insulin-filter-hint";
 import { InsulinRangeFilter } from "./_components/insulin-range-filter";
 import {
-  INTRO_TEXT,
   PAGE_CONTAINER,
   SECTION_TITLE,
   SURFACE_CARD,
@@ -52,7 +51,10 @@ export default async function InsulinPage({ searchParams }: InsulinPageProps) {
   });
 
   const entries = await getInsulinEntries(user.id, { takenAtGte });
-  const queryPrefill = parseInsulinQueryPrefill(params);
+  const queryPrefill = parseInsulinQueryPrefill(
+    params,
+    settings.insulin_dose_step
+  );
   const flowRaw = Array.isArray(params.flow) ? params.flow[0] : params.flow;
   const fromMealRaw =
     Array.isArray(params.fromMeal) ? params.fromMeal[0] : params.fromMeal;
@@ -78,7 +80,7 @@ export default async function InsulinPage({ searchParams }: InsulinPageProps) {
   return (
     <AppShell title="Инсулин">
       <div className={PAGE_CONTAINER}>
-        <header className="space-y-3">
+        <header className="space-y-2">
           <InsulinRangeFilter activeRange={range} />
           {range !== "all" && takenAtGte ? (
             <InsulinFilterHint
@@ -96,11 +98,16 @@ export default async function InsulinPage({ searchParams }: InsulinPageProps) {
               )}
             />
           ) : null}
-          <p className={INTRO_TEXT}>
-            Журнал введений: базальный, болюс и коррекция. Запись здесь не
-            означает автоматическую дозу — вы подтверждаете введение сами.
-            Первую запись добавьте формой ниже.
-          </p>
+          <details className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs leading-relaxed text-white/50">
+            <summary className="cursor-pointer list-none font-medium text-white/60 [&::-webkit-details-marker]:hidden">
+              О журнале{" "}
+              <span className="font-normal text-white/35">▼</span>
+            </summary>
+            <p className="mt-2">
+              Базальный, болюс и коррекция. Запись появляется только после
+              сохранения — автоматически доза не назначается.
+            </p>
+          </details>
         </header>
 
         <section
@@ -108,13 +115,6 @@ export default async function InsulinPage({ searchParams }: InsulinPageProps) {
           className={`${SURFACE_CARD} scroll-mt-24`}
           aria-label="Добавить введение инсулина"
         >
-          {queryPrefill ? (
-            <p className="mb-4 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs leading-relaxed text-white/55">
-              Поля ниже подставлены из ссылки (например, после помощника
-              болюса). Это только черновик — проверьте дозу и время перед
-              сохранением.
-            </p>
-          ) : null}
           <InsulinForm
             key={formKey}
             queryPrefill={queryPrefill}

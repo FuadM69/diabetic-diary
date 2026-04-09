@@ -7,13 +7,18 @@
  */
 import type { UserSettings } from "@/lib/types/glucose";
 import { createClient } from "@/lib/supabase/server";
+import type { InsulinDoseStep } from "@/lib/utils/insulin-dose-step";
+import {
+  DEFAULT_INSULIN_DOSE_STEP,
+  normalizeInsulinDoseStepFromDb,
+} from "@/lib/utils/insulin-dose-step";
 
 const DEFAULT_GLUCOSE_MIN = 5.0;
 const DEFAULT_GLUCOSE_MAX = 7.0;
 const SETTINGS_SELECT_LEGACY =
   "glucose_target_min, glucose_target_max, carb_ratio, insulin_sensitivity, timezone";
 const SETTINGS_SELECT_FULL =
-  "glucose_target_min, glucose_target_max, carb_ratio, insulin_sensitivity, carb_ratio_morning, carb_ratio_day, carb_ratio_evening, carb_ratio_night, insulin_sensitivity_morning, insulin_sensitivity_day, insulin_sensitivity_evening, insulin_sensitivity_night, timezone";
+  "glucose_target_min, glucose_target_max, insulin_dose_step, carb_ratio, insulin_sensitivity, carb_ratio_morning, carb_ratio_day, carb_ratio_evening, carb_ratio_night, insulin_sensitivity_morning, insulin_sensitivity_day, insulin_sensitivity_evening, insulin_sensitivity_night, timezone";
 
 function isMissingTimeOfDaySettingsColumnsError(error: unknown): boolean {
   if (!error || typeof error !== "object") {
@@ -39,7 +44,8 @@ function isMissingTimeOfDaySettingsColumnsError(error: unknown): boolean {
     message.includes("insulin_sensitivity_morning") ||
     message.includes("insulin_sensitivity_day") ||
     message.includes("insulin_sensitivity_evening") ||
-    message.includes("insulin_sensitivity_night")
+    message.includes("insulin_sensitivity_night") ||
+    message.includes("insulin_dose_step")
   );
 }
 
@@ -59,6 +65,7 @@ function normalizeRow(data: Record<string, unknown> | null): UserSettings {
       insulin_sensitivity_evening: null,
       insulin_sensitivity_night: null,
       timezone: null,
+      insulin_dose_step: DEFAULT_INSULIN_DOSE_STEP,
     };
   }
 
@@ -75,6 +82,7 @@ function normalizeRow(data: Record<string, unknown> | null): UserSettings {
   const isensEveningRaw = data.insulin_sensitivity_evening;
   const isensNightRaw = data.insulin_sensitivity_night;
   const tzRaw = data.timezone;
+  const doseStepRaw = data.insulin_dose_step;
 
   const glucose_target_min =
     typeof minRaw === "number" && Number.isFinite(minRaw)
@@ -123,10 +131,12 @@ function normalizeRow(data: Record<string, unknown> | null): UserSettings {
       : null;
   const timezone =
     typeof tzRaw === "string" && tzRaw.trim().length > 0 ? tzRaw.trim() : null;
+  const insulin_dose_step = normalizeInsulinDoseStepFromDb(doseStepRaw);
 
   return {
     glucose_target_min,
     glucose_target_max,
+    insulin_dose_step,
     carb_ratio,
     insulin_sensitivity,
     carb_ratio_morning,
@@ -174,6 +184,7 @@ export async function getUserSettings(userId: string): Promise<UserSettings> {
 export type UserSettingsUpdatePayload = {
   glucose_target_min: number;
   glucose_target_max: number;
+  insulin_dose_step: InsulinDoseStep;
   carb_ratio: number | null;
   insulin_sensitivity: number | null;
   carb_ratio_morning: number | null;
@@ -201,6 +212,7 @@ export async function updateUserSettings(
     user_id: userId,
     glucose_target_min: patch.glucose_target_min,
     glucose_target_max: patch.glucose_target_max,
+    insulin_dose_step: patch.insulin_dose_step,
     carb_ratio: patch.carb_ratio,
     insulin_sensitivity: patch.insulin_sensitivity,
     carb_ratio_morning: patch.carb_ratio_morning,

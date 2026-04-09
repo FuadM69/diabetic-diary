@@ -9,7 +9,10 @@ import type {
 } from "@/lib/types/bolus";
 import type { UserSettings } from "@/lib/types/glucose";
 import type { BolusEstimate } from "@/lib/utils/bolus";
-import { computeBolusEstimate } from "@/lib/utils/bolus";
+import {
+  computeBolusEstimate,
+  insulinUnitsPerTypicalBreadUnit,
+} from "@/lib/utils/bolus";
 import type { BolusUrlPrefill } from "@/lib/utils/bolus-prefill";
 import { buildInsulinPrefillHref } from "@/lib/utils/bolus-prefill";
 import {
@@ -140,6 +143,14 @@ export function BolusForm({
   );
   const readyForActiveTime = resolvedForActiveTime.ready;
 
+  const insulinPerXeLine = useMemo(() => {
+    const cr = resolvedForActiveTime.carbRatio;
+    if (cr == null) {
+      return null;
+    }
+    return insulinUnitsPerTypicalBreadUnit(cr);
+  }, [resolvedForActiveTime.carbRatio]);
+
   const handleEstimate = () => {
     setError(null);
     setEstimate(null);
@@ -182,6 +193,7 @@ export function BolusForm({
       ? buildInsulinPrefillHref({
           totalBolus: estimate.totalBolus,
           linkedMealId: insulinLinkedMealId,
+          doseStep: settings.insulin_dose_step,
         })
       : null;
 
@@ -216,36 +228,6 @@ export function BolusForm({
       ) : null}
 
       <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4 space-y-4">
-        <div
-          className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-xs text-white/70"
-          role="status"
-        >
-          <p>
-            Активный блок коэффициентов:{" "}
-            <span className="font-medium text-white">
-              {resolvedForActiveTime.blockLabel}
-            </span>
-            .
-          </p>
-          <p className="mt-1 tabular-nums text-white/80">
-            УК:{" "}
-            {resolvedForActiveTime.carbRatio != null ?
-              resolvedForActiveTime.carbRatio
-            : "—"}
-            {" · "}Чувствительность:{" "}
-            {resolvedForActiveTime.insulinSensitivity != null ?
-              resolvedForActiveTime.insulinSensitivity
-            : "—"}
-          </p>
-          {resolvedForActiveTime.usesFallbackCarbRatio ||
-          resolvedForActiveTime.usesFallbackSensitivity ? (
-            <p className="mt-1 text-white/50">
-              Для этого блока часть значений не заполнена — использованы базовые
-              из «Настроек».
-            </p>
-          ) : null}
-        </div>
-
         <div className="space-y-2">
           {mealContextDisplay ? (
             <>
@@ -268,11 +250,15 @@ export function BolusForm({
                     {mealContextDisplay.carbsGrams} г
                   </span>
                 </p>
-                <p className="mt-1 text-xs leading-relaxed text-white/50">
-                  Значение в поле «Углеводы» ниже вы вводите или подставляете
-                  сами — оно участвует в расчёте. Цифра выше показывает сумму
-                  из записи приёма пищи.
-                </p>
+                <details className="mt-1 text-xs text-white/45">
+                  <summary className="cursor-pointer text-white/50">
+                    Про поле «Углеводы» ниже
+                  </summary>
+                  <p className="mt-1.5 leading-relaxed">
+                    Сумма в поле может отличаться от журнала — в расчёт идёт то,
+                    что в поле.
+                  </p>
+                </details>
                 {showJournalVsUrlCarbsHint ? (
                   <p className="mt-2 border-t border-white/10 pt-2 text-xs leading-relaxed text-amber-100/90">
                     В журнале сейчас {mealContextDisplay.carbsGrams} г; из ссылки
@@ -287,10 +273,9 @@ export function BolusForm({
               <p className="text-xs font-medium uppercase tracking-wide text-white/45">
                 Ручной расчёт
               </p>
-              <p className="text-xs leading-relaxed text-white/45">
-                Приём пищи из журнала не выбран. Углеводы и время ниже задаёте
-                вы; свяжите с записью, открыв помощник с карточки приёма или
-                нажав недавний приём.
+              <p className="text-xs text-white/45">
+                Углеводы и глюкозу вводите ниже. Связь с приёмом — через недавние
+                кнопки или ссылку с карточки.
               </p>
               {linkedMealMissing ? (
                 <p
@@ -307,23 +292,22 @@ export function BolusForm({
         </div>
 
         {mealRefIso ? (
-          <div
-            className="rounded-2xl border border-sky-500/30 bg-sky-950/20 px-3 py-3 text-xs leading-relaxed text-white/80"
+          <details
+            className="rounded-2xl border border-sky-500/30 bg-sky-950/20 px-3 py-2 text-xs text-white/75"
             role="note"
           >
-            <p className="font-medium text-sky-100/95">
-              Время приёма для правила глюкозы
-            </p>
-            <p className="mt-0.5 tabular-nums text-white">
-              {formatGlucoseDate(mealRefIso)}
-            </p>
-            <p className="mt-2 text-white/55">
-              Помощник предлагает только замеры из журнала глюкозы{" "}
+            <summary className="cursor-pointer font-medium text-sky-100/95">
+              Время приёма для глюкозы:{" "}
+              <span className="tabular-nums font-normal text-white">
+                {formatGlucoseDate(mealRefIso)}
+              </span>
+            </summary>
+            <p className="mt-2 leading-relaxed text-white/55">
+              Подставляются только замеры{" "}
               <span className="text-white/75">на этот момент или раньше</span>.
-              Более поздние замеры (включая «сейчас») не подставляются
-              автоматически.
+              Более поздние не выбираются автоматически.
             </p>
-          </div>
+          </details>
         ) : null}
 
         {recentMeals.length > 0 ? (
@@ -458,12 +442,46 @@ export function BolusForm({
         >
           Показать оценку
         </button>
+
+        <div
+          className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-xs text-white/70"
+          role="status"
+        >
+          <p>
+            Активный блок коэффициентов:{" "}
+            <span className="font-medium text-white">
+              {resolvedForActiveTime.blockLabel}
+            </span>
+            .
+          </p>
+          <p className="mt-1 tabular-nums text-white/80">
+            УК (г на 1 ед.):{" "}
+            {resolvedForActiveTime.carbRatio != null ?
+              resolvedForActiveTime.carbRatio
+            : "—"}
+            {insulinPerXeLine ? ` · ~1 ХЕ (12 г): ${insulinPerXeLine} ед.` : ""}
+            {" · "}Фактор коррекции (на 1 ед.):{" "}
+            {resolvedForActiveTime.insulinSensitivity != null ?
+              resolvedForActiveTime.insulinSensitivity
+            : "—"}
+          </p>
+          {resolvedForActiveTime.usesFallbackCarbRatio ||
+          resolvedForActiveTime.usesFallbackSensitivity ? (
+            <p className="mt-1 text-white/50">
+              Для этого блока часть значений не заполнена — использованы базовые
+              из «Настроек».
+            </p>
+          ) : null}
+        </div>
       </div>
 
       <BolusResultCard
         estimate={estimate}
         message={error}
         insulinPrefillHref={insulinPrefillHref}
+        glucoseTargetMin={settings.glucose_target_min}
+        glucoseTargetMax={settings.glucose_target_max}
+        doseStep={settings.insulin_dose_step}
       />
     </div>
   );

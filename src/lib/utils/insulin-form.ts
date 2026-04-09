@@ -6,6 +6,14 @@ import {
   INSULIN_ENTRY_TYPES,
   type InsulinEntryType,
 } from "@/lib/types/insulin";
+import {
+  DEFAULT_INSULIN_DOSE_STEP,
+  insulinPrefillUnitsOrFallback,
+  roundInsulinDoseToStep,
+  type InsulinDoseStep,
+} from "@/lib/utils/insulin-dose-step";
+
+export type { InsulinDoseStep };
 
 /** Upper bound for units (typical pump/pen diary). */
 export const INSULIN_UNITS_MAX = 300;
@@ -19,16 +27,12 @@ export function isInsulinDebugLogEnabled(): boolean {
   return process.env.INSULIN_DEBUG === "1";
 }
 
-/**
- * Snap bolus estimate to 0.05 U steps (2 decimal places) so prefilled values work with
- * `type="number"` step constraints and match typical pen increments.
- */
-export function roundInsulinPrefillUnits(totalBolus: number): number {
-  if (!Number.isFinite(totalBolus) || totalBolus <= 0) {
-    return totalBolus;
-  }
-  const stepped = Math.round(totalBolus * 20) / 20;
-  return Math.round(stepped * 100) / 100;
+/** Rounds prefilled units to the user’s pen/pump step (default 0,5 ед.). */
+export function roundInsulinPrefillUnits(
+  totalBolus: number,
+  step: InsulinDoseStep = DEFAULT_INSULIN_DOSE_STEP
+): number {
+  return roundInsulinDoseToStep(totalBolus, step);
 }
 
 const ENTRY_TYPE_SET = new Set<string>(INSULIN_ENTRY_TYPES);
@@ -184,9 +188,12 @@ function firstQueryValue(
 /**
  * Safe query-only prefill for /insulin. Does not persist; values must pass
  * the same unit checks as the form on submit.
+ * `doseStep` should be the signed-in user’s шаг дозы из настроек — тот же
+ * сетка, что при построении ссылок из болюса/глюкозы/калькулятора.
  */
 export function parseInsulinQueryPrefill(
-  raw: Record<string, string | string[] | undefined>
+  raw: Record<string, string | string[] | undefined>,
+  doseStep: InsulinDoseStep = DEFAULT_INSULIN_DOSE_STEP
 ): InsulinQueryPrefill | null {
   const unitsRaw = firstQueryValue(raw.units)?.trim();
   if (!unitsRaw) {
@@ -211,7 +218,9 @@ export function parseInsulinQueryPrefill(
   }
 
   return {
-    units: String(roundInsulinPrefillUnits(unitsParsed.value)),
+    units: String(
+      insulinPrefillUnitsOrFallback(unitsParsed.value, doseStep)
+    ),
     entry_type,
     note,
   };

@@ -151,15 +151,28 @@ export function MealItemsEditor({
     });
   };
 
+  const applySuggestionToActiveRow = (p: FoodProduct) => {
+    const rowId = activeRowId ?? rows[0]?.id ?? null;
+    if (!rowId) {
+      return;
+    }
+    const el = selectRefs.current[rowId];
+    if (!el) {
+      return;
+    }
+    el.value = p.id;
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+
   return (
     <div className="space-y-3">
       <p className="text-sm font-medium text-white/80">Состав</p>
 
       <div className="rounded-2xl border border-white/20 bg-white/[0.06] p-3 shadow-sm shadow-black/20">
-        <p className="text-sm font-medium text-white/90">
-          Поиск продукта по названию или бренду
+        <p className="text-xs font-medium text-white/80">
+          Поиск в каталоге
         </p>
-        <div className="mt-2 flex flex-wrap gap-2">
+        <div className="mt-1.5 flex flex-wrap gap-2">
           <button
             type="button"
             disabled={disabled}
@@ -206,41 +219,50 @@ export function MealItemsEditor({
             disabled={disabled}
             autoComplete="off"
             className={inputClass}
-            placeholder="Начните вводить…"
+            placeholder="Название или бренд…"
             aria-label="Поиск продукта по названию или бренду"
           />
         </label>
-        <p className="mt-1.5 text-[0.7rem] leading-snug text-white/45">
-          Сужает список в каждой строке «Продукт» ниже. Подсказки подставляют
-          выбор в строку, с которой вы недавно работали (фокус на списке).
-        </p>
         {suggestionProducts.length > 0 ? (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {suggestionProducts.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                disabled={disabled}
-                onClick={() => {
-                  const rowId =
-                    activeRowId ?? rows[0]?.id ??
-                    null;
-                  if (!rowId) {
-                    return;
-                  }
-                  const el = selectRefs.current[rowId];
-                  if (!el) {
-                    return;
-                  }
-                  el.value = p.id;
-                  el.dispatchEvent(new Event("change", { bubbles: true }));
-                }}
-                className="max-w-full truncate rounded-full border border-white/15 bg-white/[0.07] px-2.5 py-1 text-left text-[0.7rem] text-white/85 hover:bg-white/[0.12] disabled:opacity-50"
-              >
-                {getDisplayProductName(p.name)}
-                {p.brand ? ` · ${p.brand}` : ""}
-              </button>
-            ))}
+          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-black/25 px-2 py-1.5">
+            <span className="min-w-0 flex-1 truncate text-[0.7rem] text-white/80">
+              <span className="text-white/45">Совпадение:</span>{" "}
+              <span className="font-medium text-white/90">
+                {getDisplayProductName(suggestionProducts[0].name)}
+                {suggestionProducts[0].brand ?
+                  ` · ${suggestionProducts[0].brand}`
+                : ""}
+              </span>
+            </span>
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => applySuggestionToActiveRow(suggestionProducts[0])}
+              className="shrink-0 rounded-lg border border-white/20 bg-white/[0.08] px-2 py-1 text-[0.65rem] font-medium text-white/90 hover:bg-white/[0.14] disabled:opacity-50"
+            >
+              В строку
+            </button>
+            {suggestionProducts.length > 1 ? (
+              <details className="shrink-0 [&_summary::-webkit-details-marker]:hidden">
+                <summary className="cursor-pointer list-none rounded-lg border border-white/15 bg-white/[0.05] px-2 py-1 text-[0.65rem] text-white/55">
+                  +{suggestionProducts.length - 1}
+                </summary>
+                <div className="mt-1.5 flex max-h-28 flex-wrap gap-1 overflow-y-auto pr-0.5">
+                  {suggestionProducts.slice(1).map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => applySuggestionToActiveRow(p)}
+                      className="max-w-full truncate rounded-full border border-white/12 bg-white/[0.06] px-2 py-0.5 text-left text-[0.65rem] text-white/80 hover:bg-white/[0.1] disabled:opacity-50"
+                    >
+                      {getDisplayProductName(p.name)}
+                      {p.brand ? ` · ${p.brand}` : ""}
+                    </button>
+                  ))}
+                </div>
+              </details>
+            ) : null}
           </div>
         ) : null}
       </div>

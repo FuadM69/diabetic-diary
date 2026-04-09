@@ -120,20 +120,20 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   return (
     <AppShell title="Главная">
       <div className={PAGE_CONTAINER}>
-        <DashboardGreeting displayName={displayName} isOnboarding={isOnboarding} />
+        <DashboardGreeting
+          displayName={displayName}
+          isOnboarding={isOnboarding}
+        />
 
         {isOnboarding ? (
           <DashboardOnboarding />
         ) : (
           <>
-            <div className="flex justify-end">
-              <DashboardRefreshButton />
-            </div>
-
             <DashboardTodaySection
               latest={latest}
               todayStats={todayStats}
               userTimezone={settings.timezone}
+              trailing={<DashboardRefreshButton />}
             />
 
             <section className="space-y-2">

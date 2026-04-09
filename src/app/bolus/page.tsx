@@ -19,11 +19,10 @@ import {
   hasBolusUrlPrefill,
   parseBolusUrlPrefill,
 } from "@/lib/utils/bolus-prefill";
-import { bolusSettingsReady } from "@/lib/utils/bolus-form";
 import { formatGlucoseDate } from "@/lib/utils/glucose";
 import { sumCarbsFromItems } from "@/lib/utils/meal-nutrition";
 import { BolusForm } from "./_components/bolus-form";
-import { CALLOUT_SUBTLE, INTRO_TEXT, PAGE_CONTAINER } from "@/lib/ui/page-patterns";
+import { PAGE_CONTAINER } from "@/lib/ui/page-patterns";
 
 type BolusPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -121,8 +120,6 @@ export default async function BolusPage({ searchParams }: BolusPageProps) {
     getLatestGlucoseEntry(user.id),
   ]);
 
-  const bolusMathReady = bolusSettingsReady(settings);
-
   const { initialMealContext, linkedMealMissing, linkedMealEatenAtIso } =
     await resolveBolusMealContextFromUrl(
       user.id,
@@ -175,39 +172,6 @@ export default async function BolusPage({ searchParams }: BolusPageProps) {
   return (
     <AppShell title="Помощник болюса">
       <div className={PAGE_CONTAINER}>
-        <header className="space-y-3">
-          <p className={INTRO_TEXT}>
-            Оценка болюса на еду и коррекцию по вашим{" "}
-            <Link
-              href="/settings"
-              className="text-white/85 underline decoration-white/25 underline-offset-2"
-            >
-              настройкам
-            </Link>
-            : углеводный коэффициент, чувствительность и целевой диапазон
-            глюкозы. Сервис не подключается к помпе и не пишет дозы в журнал
-            автоматически.
-          </p>
-          <div className={CALLOUT_SUBTLE} role="note">
-            <strong className="font-medium text-white/70">Важно:</strong> это
-            вспомогательный расчёт, а не медицинская рекомендация. Проверяйте
-            дозу самостоятельно; при сомнениях обратитесь к врачу.
-          </div>
-          {!bolusMathReady ? (
-            <p className={CALLOUT_SUBTLE} role="status">
-              Расчёт недоступен, пока в настройках не заполнены оба поля:
-              углеводный коэффициент и чувствительность к инсулину.
-            </p>
-          ) : null}
-          {fromLink ? (
-            <p className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-xs leading-relaxed text-white/55">
-              Поля ниже подставлены из ссылки (например, с карточки приёма
-              пищи). Это только удобство ввода — всегда проверьте цифры перед
-              расчётом.
-            </p>
-          ) : null}
-        </header>
-
         <BolusForm
           settings={settings}
           recentMeals={recentMeals}
@@ -217,6 +181,39 @@ export default async function BolusPage({ searchParams }: BolusPageProps) {
           mealGlucoseReferenceIso={glucoseAnchorIso}
           defaultGlucoseSuggestion={defaultGlucoseSuggestion}
         />
+
+        <details
+          className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs leading-relaxed text-white/55"
+          role="note"
+        >
+          <summary className="cursor-pointer list-none text-sm font-medium text-white/70 [&::-webkit-details-marker]:hidden">
+            Расчёт вспомогательный, не заменяет медицинские рекомендации{" "}
+            <span className="font-normal text-white/35">▼</span>
+          </summary>
+          <div className="mt-3 space-y-2 border-t border-white/10 pt-3">
+            <p>
+              Оценка на еду и коррекцию по{" "}
+              <Link
+                href="/settings"
+                className="text-white/80 underline decoration-white/25 underline-offset-2"
+              >
+                настройкам
+              </Link>{" "}
+              (УК, коррекция, цель глюкозы). Запись в журнал инсулина сюда не
+              сохраняется — только переход в форму по вашему действию.
+            </p>
+            <p>
+              Не заменяет консультацию врача. Проверяйте дозу; при сомнениях —
+              к специалисту.
+            </p>
+            {fromLink ? (
+              <p className="text-white/50">
+                Если открыли страницу по ссылке — сверьте подставленные углеводы
+                и глюкозу перед расчётом.
+              </p>
+            ) : null}
+          </div>
+        </details>
       </div>
     </AppShell>
   );

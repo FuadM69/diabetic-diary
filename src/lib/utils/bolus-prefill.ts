@@ -3,10 +3,12 @@
  */
 import { formatBolusDose } from "@/lib/utils/bolus";
 import { GLUCOSE_INPUT_MAX } from "@/lib/utils/glucose";
+import { INSULIN_NOTE_PREFILL_MAX } from "@/lib/utils/insulin-form";
 import {
-  INSULIN_NOTE_PREFILL_MAX,
-  roundInsulinPrefillUnits,
-} from "@/lib/utils/insulin-form";
+  DEFAULT_INSULIN_DOSE_STEP,
+  insulinPrefillUnitsOrFallback,
+  type InsulinDoseStep,
+} from "@/lib/utils/insulin-dose-step";
 
 /** Reasonable upper bound for "carbs this meal" in the helper (g). */
 const BOLUS_PREFILL_CARBS_MAX = 2000;
@@ -135,7 +137,7 @@ export function buildInsulinNoteFromBolusContext(params: {
   totalBolus: number;
   linkedMealId: string | null;
 }): string {
-  let s = `Болюс по оценке помощника: ${formatBolusDose(params.totalBolus)} УЕ. Проверьте дозу перед введением.`;
+  let s = `Болюс по оценке помощника: ${formatBolusDose(params.totalBolus)} ед. Проверьте дозу и время.`;
   if (params.linkedMealId && UUID_RE.test(params.linkedMealId)) {
     const marker = `${LINKED_MEAL_NOTE_MARKER_PREFIX}${params.linkedMealId}${LINKED_MEAL_NOTE_MARKER_SUFFIX}`;
     const markerSuffix = ` ${marker}`;
@@ -179,15 +181,52 @@ export function stripLinkedMealMarkerFromInsulinNote(
 export function buildInsulinPrefillHref(params: {
   totalBolus: number;
   linkedMealId: string | null;
+  doseStep?: InsulinDoseStep;
 }): string {
-  const note = buildInsulinNoteFromBolusContext(params);
+  const step = params.doseStep ?? DEFAULT_INSULIN_DOSE_STEP;
+  const unitsPrefill = insulinPrefillUnitsOrFallback(params.totalBolus, step);
+  const note = buildInsulinNoteFromBolusContext({
+    totalBolus: unitsPrefill,
+    linkedMealId: params.linkedMealId,
+  });
   const q = new URLSearchParams();
-  q.set("units", String(roundInsulinPrefillUnits(params.totalBolus)));
+  q.set("units", String(unitsPrefill));
   q.set("entry_type", "bolus");
   q.set("flow", "bolus");
   if (params.linkedMealId) {
     q.set("fromMeal", "1");
   }
+  if (note.length > 0) {
+    q.set("note", note);
+  }
+  return `/insulin?${q.toString()}#insulin-add`;
+}
+
+/** Черновик коррекции из подсказки на экране глюкозы (без flow=bolus). */
+export function buildGlucoseCorrectionInsulinPrefillHref(params: {
+  roundedUnits: number;
+}): string {
+  const q = new URLSearchParams();
+  q.set("units", String(params.roundedUnits));
+  q.set("entry_type", "correction");
+  const draftNote = `Глюкоза: подсказка коррекции ${formatBolusDose(params.roundedUnits)} ед. Проверьте дозу и время.`;
+  const note = draftNote.slice(0, INSULIN_NOTE_PREFILL_MAX);
+  if (note.length > 0) {
+    q.set("note", note);
+  }
+  return `/insulin?${q.toString()}#insulin-add`;
+}
+
+/** Черновик для /insulin из локального калькулятора (без flow=bolus — не шаг мастера из приёма пищи). */
+export function buildCalculatorInsulinPrefillHref(params: {
+  /** Уже округлённая доза «к вводу». */
+  roundedUnits: number;
+}): string {
+  const q = new URLSearchParams();
+  q.set("units", String(params.roundedUnits));
+  q.set("entry_type", "bolus");
+  const draftNote = `Калькулятор: черновик ${formatBolusDose(params.roundedUnits)} ед. Проверьте дозу и время.`;
+  const note = draftNote.slice(0, INSULIN_NOTE_PREFILL_MAX);
   if (note.length > 0) {
     q.set("note", note);
   }

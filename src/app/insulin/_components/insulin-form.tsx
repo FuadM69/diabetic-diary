@@ -147,19 +147,39 @@ export function InsulinForm({
       {prefillMealId ? (
         <input type="hidden" name="linked_meal_id" value={prefillMealId} />
       ) : null}
-      {prefillFromBolusFlow && !state.success ? (
+      {!state.success && (queryPrefill != null || prefillFromBolusFlow) ? (
         <div
-          className="rounded-2xl border border-sky-500/30 bg-sky-950/25 px-3 py-2.5 text-xs leading-relaxed text-sky-100/90"
+          className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2"
           role="status"
         >
-          <p className="font-medium">
-            Статус: шаг 2 из 3 — черновик дозы перенесён в форму инсулина.
+          <p className="text-xs font-medium text-white/85">
+            Это черновик — проверьте дозу и время перед сохранением.
           </p>
-          <p className="mt-1 text-sky-100/80">
-            Проверьте дозу и время, затем нажмите «Добавить запись», чтобы
-            завершить шаг 3 (сохранение в журнал).
-            {prefillFromMeal ? " Источник: расчёт из приёма пищи." : ""}
-          </p>
+          {prefillFromBolusFlow ? (
+            <p className="mt-1 text-[0.7rem] text-sky-200/90">
+              Шаг 2 из 3 — из помощника болюса
+              {prefillFromMeal ? " · приём пищи" : ""}.
+            </p>
+          ) : null}
+          <details className="mt-1.5 text-[0.65rem] text-white/45 [&_summary::-webkit-details-marker]:hidden">
+            <summary className="cursor-pointer list-none text-white/50">
+              Подробнее
+            </summary>
+            <div className="mt-1.5 space-y-1.5 border-t border-white/10 pt-1.5 leading-relaxed">
+              {queryPrefill ? (
+                <p>
+                  Поля могли подставиться из ссылки (помощник болюса,
+                  калькулятор, экран глюкозы). Строка в журнале появится только
+                  после «Добавить запись».
+                </p>
+              ) : null}
+              {prefillFromBolusFlow ? (
+                <p>
+                  Шаг 3 — сохранение в журнал кнопкой «Добавить запись».
+                </p>
+              ) : null}
+            </div>
+          </details>
         </div>
       ) : null}
 

@@ -18,8 +18,8 @@ const TYPE_PRESENTATION: Record<
     badge: "bg-sky-500/15 text-sky-100 ring-1 ring-sky-400/28",
   },
   bolus: {
-    card: "border-zinc-400/20 bg-zinc-500/[0.06]",
-    badge: "bg-zinc-500/12 text-zinc-100 ring-1 ring-zinc-400/22",
+    card: "border-teal-400/22 bg-teal-500/[0.065]",
+    badge: "bg-teal-500/12 text-teal-100 ring-1 ring-teal-400/26",
   },
   correction: {
     card: "border-amber-500/28 bg-amber-500/[0.07]",

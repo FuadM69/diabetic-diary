@@ -37,7 +37,7 @@ export function bolusSettingsReady(settings: UserSettings): boolean {
 }
 
 export function bolusSettingsMissingMessage(): string {
-  return "Укажите в настройках углеводный коэффициент и чувствительность к инсулину — без обоих полей помощник не считает оценку болюса.";
+  return "В настройках укажите УК (г углеводов на 1 ед.) и фактор коррекции (сдвиг глюкозы на 1 ед.) — без них оценка недоступна.";
 }
 
 function isPositiveNumber(v: number | null | undefined): v is number {

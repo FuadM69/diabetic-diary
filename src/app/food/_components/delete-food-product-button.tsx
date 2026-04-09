@@ -57,7 +57,7 @@ function DeleteConfirmForm({
     <form action={formAction} className="space-y-4">
       <input type="hidden" name="productId" value={productId} />
       <p className="text-sm text-white/70">
-        Удалить этот продукт из каталога? Действие нельзя отменить.
+        Удалить этот продукт из вашего списка? Действие нельзя отменить.
       </p>
       {state.error ? (
         <p role="alert" className={FEEDBACK_ERROR}>

@@ -16,8 +16,35 @@ import {
   readZonedWallClockParts,
   resolveLogRangeTimeZone,
 } from "@/lib/utils/log-range-bounds";
-import { sumCaloriesFromItems, sumCarbsFromItems } from "@/lib/utils/meal-nutrition";
+import { BREAD_UNIT_GRAMS_TYPICAL_RU } from "@/lib/utils/bolus";
+import {
+  roundMealNutrition,
+  sumCaloriesFromItems,
+  sumCarbsFromItems,
+} from "@/lib/utils/meal-nutrition";
+import type { InsulinEntryType } from "@/lib/types/insulin";
 import { INSULIN_ENTRY_TYPE_LABEL_RU } from "@/lib/utils/insulin";
+
+const HISTORY_INSULIN_STYLE: Record<
+  InsulinEntryType,
+  { card: string; badge: string }
+> = {
+  basal: {
+    card: "border-sky-500/25 bg-sky-500/[0.06]",
+    badge:
+      "inline-flex rounded-full border border-sky-400/35 bg-sky-400/12 px-2.5 py-0.5 text-[0.65rem] font-medium uppercase tracking-wide text-sky-100/90",
+  },
+  bolus: {
+    card: "border-teal-400/22 bg-teal-500/[0.065]",
+    badge:
+      "inline-flex rounded-full border border-teal-400/26 bg-teal-400/10 px-2.5 py-0.5 text-[0.65rem] font-medium uppercase tracking-wide text-teal-100/90",
+  },
+  correction: {
+    card: "border-amber-500/28 bg-amber-500/[0.06]",
+    badge:
+      "inline-flex rounded-full border border-amber-400/30 bg-amber-400/12 px-2.5 py-0.5 text-[0.65rem] font-medium uppercase tracking-wide text-amber-100/90",
+  },
+};
 
 type TimelineItem =
   | {
@@ -112,6 +139,49 @@ function groupTimelineByUserCalendarDay(
   return groups;
 }
 
+function computeHistoryDayTotals(items: TimelineItem[]): {
+  mealCount: number;
+  insulinCount: number;
+  totalCarbsG: number;
+  totalKcal: number;
+  totalInsulinU: number;
+} {
+  let mealCount = 0;
+  let insulinCount = 0;
+  let totalCarbsG = 0;
+  let totalKcal = 0;
+  let totalInsulinU = 0;
+
+  for (const item of items) {
+    if (item.type === "meal") {
+      mealCount++;
+      totalCarbsG += sumCarbsFromItems(item.data.meal_items);
+      totalKcal += sumCaloriesFromItems(item.data.meal_items);
+    } else if (item.type === "insulin") {
+      insulinCount++;
+      const u = item.data.units;
+      if (typeof u === "number" && Number.isFinite(u) && u >= 0) {
+        totalInsulinU += u;
+      }
+    }
+  }
+
+  return {
+    mealCount,
+    insulinCount,
+    totalCarbsG: roundMealNutrition(totalCarbsG),
+    totalKcal: roundMealNutrition(totalKcal),
+    totalInsulinU: roundMealNutrition(totalInsulinU),
+  };
+}
+
+function formatHistoryStat(n: number, maxFrac: number): string {
+  return new Intl.NumberFormat("ru-RU", {
+    maximumFractionDigits: maxFrac,
+    minimumFractionDigits: 0,
+  }).format(n);
+}
+
 export default async function HistoryPage() {
   const user = await getCurrentUser();
   if (!user) {
@@ -161,8 +231,19 @@ export default async function HistoryPage() {
           </section>
         ) : (
           <div className="space-y-4">
-            {timelineByDay.map((group, groupIndex) => (
-              <details
+            {timelineByDay.map((group, groupIndex) => {
+              const dayTotals = computeHistoryDayTotals(group.items);
+              const showDayTotals =
+                dayTotals.mealCount > 0 || dayTotals.insulinCount > 0;
+              const dayXe =
+                dayTotals.mealCount > 0 ?
+                  roundMealNutrition(
+                    dayTotals.totalCarbsG / BREAD_UNIT_GRAMS_TYPICAL_RU
+                  )
+                : null;
+
+              return (
+                <details
                 key={group.dayKey}
                 className="group rounded-3xl border border-white/10 bg-white/[0.02] open:bg-white/[0.03]"
                 open={groupIndex < 2}
@@ -183,6 +264,48 @@ export default async function HistoryPage() {
                       </span>
                     </span>
                   </div>
+                  {showDayTotals ? (
+                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 border-t border-white/10 pt-2 text-[0.65rem] leading-snug text-white/55">
+                      {dayTotals.mealCount > 0 ? (
+                        <>
+                          <span>
+                            Угл.{" "}
+                            <span className="tabular-nums text-white/75">
+                              {formatHistoryStat(dayTotals.totalCarbsG, 1)}
+                            </span>
+                            {" г"}
+                          </span>
+                          {dayXe != null ? (
+                            <span className="text-white/55">
+                              ~{" "}
+                              <span className="tabular-nums text-white/75">
+                                {formatHistoryStat(dayXe, 2)}
+                              </span>
+                              {" ХЕ "}
+                              <span className="text-white/40">
+                                ({BREAD_UNIT_GRAMS_TYPICAL_RU} г/ХЕ)
+                              </span>
+                            </span>
+                          ) : null}
+                          <span>
+                            Ккал{" "}
+                            <span className="tabular-nums text-white/75">
+                              {formatHistoryStat(dayTotals.totalKcal, 0)}
+                            </span>
+                          </span>
+                        </>
+                      ) : null}
+                      {dayTotals.insulinCount > 0 ? (
+                        <span>
+                          Инсулин{" "}
+                          <span className="tabular-nums text-white/75">
+                            {formatHistoryStat(dayTotals.totalInsulinU, 2)}
+                          </span>
+                          {" ед."}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </summary>
                 <div className="space-y-3.5 border-t border-white/10 px-3 pb-3 pt-3">
                   {group.items.map((item) => {
@@ -289,15 +412,16 @@ export default async function HistoryPage() {
               const noteForDisplay = stripLinkedMealMarkerFromInsulinNote(
                 item.data.note
               );
+              const insulStyle =
+                HISTORY_INSULIN_STYLE[item.data.entry_type] ??
+                HISTORY_INSULIN_STYLE.bolus;
               return (
                 <section
                   key={item.id}
-                  className="rounded-3xl border border-zinc-400/20 bg-zinc-500/[0.06] p-4"
+                  className={`rounded-3xl border p-4 ${insulStyle.card}`}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <p className="inline-flex rounded-full border border-zinc-400/28 bg-zinc-400/10 px-2.5 py-0.5 text-[0.65rem] font-medium uppercase tracking-wide text-zinc-100/90">
-                      Инсулин
-                    </p>
+                    <p className={insulStyle.badge}>Инсулин</p>
                     <p className="shrink-0 tabular-nums text-[0.72rem] text-white/55">
                       {formatUtcIsoForUserDisplay(item.occurredAt, settings.timezone, {
                         dateStyle: "medium",
@@ -327,8 +451,9 @@ export default async function HistoryPage() {
               );
                   })}
                 </div>
-              </details>
-            ))}
+                </details>
+              );
+            })}
           </div>
         )}
       </div>

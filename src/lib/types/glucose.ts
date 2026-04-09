@@ -3,6 +3,8 @@
  * When Supabase generates `Database`, map row types here (e.g. Tables<"glucose_entries">).
  */
 
+import type { InsulinDoseStep } from "@/lib/utils/insulin-dose-step";
+
 export type GlucoseStatus = "low" | "in_range" | "high";
 
 /** Row from `public.glucose_entries` (selected columns in app queries). */
@@ -23,6 +25,8 @@ export type GlucoseEntry = {
 export type UserSettings = {
   glucose_target_min: number;
   glucose_target_max: number;
+  /** Pen/pump unit grid for dose display and prefill rounding. */
+  insulin_dose_step: InsulinDoseStep;
   carb_ratio: number | null;
   insulin_sensitivity: number | null;
   carb_ratio_morning?: number | null;

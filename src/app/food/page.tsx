@@ -38,9 +38,8 @@ export default async function FoodPage({ searchParams }: FoodPageProps) {
       <div className={PAGE_CONTAINER}>
         <header>
           <p className={INTRO_TEXT}>
-            Продукты нужны, чтобы собирать приёмы пищи: ищите в общем каталоге
-            или добавьте свои. Стартовый набор уже доступен для быстрого ввода;
-            свои позиции по умолчанию видны только вам.
+            Это ваш личный список продуктов: добавляйте и редактируйте позиции
+            сами — они нужны, чтобы указывать состав в приёмах пищи.
           </p>
         </header>
 
@@ -52,7 +51,7 @@ export default async function FoodPage({ searchParams }: FoodPageProps) {
 
         <section className="space-y-3">
           <h2 className={SECTION_TITLE}>
-            Каталог
+            Мои продукты
             {hasSearch ? (
               <span className="ml-2 font-normal text-white/45">
                 · поиск: «{q}»

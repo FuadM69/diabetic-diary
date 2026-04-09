@@ -37,8 +37,8 @@ export function FoodProductList({ products, hasSearch }: FoodProductListProps) {
     }
     return (
       <EmptyState
-        title="Каталог пока пуст."
-        description="Обычно здесь есть общие продукты (миграция в Supabase). Пока список пуст — добавьте свой продукт формой выше."
+        title="Пока нет продуктов."
+        description="Добавьте первую позицию формой выше — список только ваш, общих продуктов в приложении нет."
         variant="muted"
       />
     );

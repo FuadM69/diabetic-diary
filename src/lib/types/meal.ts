@@ -40,7 +40,7 @@ export const MEAL_TYPE_LABEL_RU: Record<MealTypeKey, string> = {
   lunch: "Обед",
   dinner: "Ужин",
   snack: "Перекус",
-  drink_only: "Отдельный напиток",
+  drink_only: "Напиток",
 };
 
 export type MealCreateItemInput = {

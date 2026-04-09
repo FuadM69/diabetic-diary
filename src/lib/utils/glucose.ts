@@ -344,11 +344,11 @@ export const GLUCOSE_CHART_STATUS_LABEL: Record<GlucoseStatus, string> = {
   high: "High",
 };
 
-export const DEFAULT_GLUCOSE_RANGE: GlucoseRangeKey = "7d";
+export const DEFAULT_GLUCOSE_RANGE: GlucoseRangeKey = "today";
 
 const RANGE_SET = new Set<string>(GLUCOSE_RANGE_OPTIONS);
 
-/** Read `range` from URL; invalid or missing → default 7d. */
+/** Read `range` from URL; invalid or missing → «Сегодня» (явный `?range=` сохраняет выбор). */
 export function parseGlucoseRangeParam(
   raw: string | string[] | undefined
 ): GlucoseRangeKey {
