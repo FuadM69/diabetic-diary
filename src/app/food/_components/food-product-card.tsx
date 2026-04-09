@@ -1,4 +1,5 @@
 import type { FoodProduct } from "@/lib/types/food";
+import { DeleteFoodProductButton } from "./delete-food-product-button";
 import { EditFoodProductDialog } from "./edit-food-product-dialog";
 import {
   getDisplayProductName,
@@ -77,8 +78,9 @@ export function FoodProductCard({ product }: FoodProductCardProps) {
         </div>
       </dl>
       {showEdit ? (
-        <div className="mt-3 border-t border-white/10 pt-3">
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-white/10 pt-3">
           <EditFoodProductDialog product={product} />
+          <DeleteFoodProductButton productId={product.id} />
         </div>
       ) : null}
     </li>

@@ -100,6 +100,7 @@ function writeMeta(
   const gen = new Intl.DateTimeFormat("ru-RU", {
     dateStyle: "long",
     timeStyle: "short",
+    hour12: false,
   }).format(generatedAt);
   doc.text(`Период: ${GLUCOSE_RANGE_LABEL[rangeKey]}`);
   doc.text(`Дата формирования: ${gen}`);

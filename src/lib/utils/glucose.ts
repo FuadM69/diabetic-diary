@@ -182,6 +182,7 @@ export function formatGlucoseValue(value: number): string {
 const defaultDateFormatter = new Intl.DateTimeFormat(undefined, {
   dateStyle: "medium",
   timeStyle: "short",
+  hour12: false,
 });
 
 export function formatGlucoseDate(isoDateString: string): string {
@@ -266,6 +267,7 @@ export function formatGlucoseChartShortLabel(
       return d.toLocaleTimeString(undefined, {
         hour: "2-digit",
         minute: "2-digit",
+        hour12: false,
       });
     }
   }
@@ -275,6 +277,7 @@ export function formatGlucoseChartShortLabel(
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   });
 }
 

@@ -160,6 +160,9 @@ export function extractLinkedMealIdFromInsulinNote(
   return UUID_RE.test(id) ? id : null;
 }
 
+const MEAL_MARKER_IN_NOTE_RE =
+  /\s*\[meal:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\]/gi;
+
 export function stripLinkedMealMarkerFromInsulinNote(
   note: string | null | undefined
 ): string | null {
@@ -167,7 +170,7 @@ export function stripLinkedMealMarkerFromInsulinNote(
     return null;
   }
   const cleaned = note
-    .replace(/\s*\[meal:[0-9a-f-]{36}\]/gi, "")
+    .replace(MEAL_MARKER_IN_NOTE_RE, "")
     .replace(/\s{2,}/g, " ")
     .trim();
   return cleaned.length > 0 ? cleaned : null;

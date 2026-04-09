@@ -85,10 +85,11 @@ export function utcIsoToDatetimeLocalInUserTimezone(
   return { ok: true, value: local };
 }
 
-/** Matches `formatGlucoseDate` styling so insulin rows look like glucose rows. */
+/** Matches diary list cards; explicit 24h for visible UI. */
 const USER_DISPLAY_DATETIME_DEFAULTS = {
   dateStyle: "medium" as const,
   timeStyle: "short" as const,
+  hour12: false as const,
 };
 
 const DATE_TIME_FORMAT_OPTION_KEYS = new Set<keyof Intl.DateTimeFormatOptions>([
@@ -275,12 +276,7 @@ export function resolveTimezoneForFormDatetime(
   | { ok: false; reason: "missing" | "invalid"; message: string } {
   const info = explainLogRangeTimeZone(savedTimezone);
   if (!info.savedTrimmed) {
-    return {
-      ok: false,
-      reason: "missing",
-      message:
-        "Укажите часовой пояс в настройках профиля — без него время из формы нельзя перевести в UTC.",
-    };
+    return { ok: true, iana: info.resolvedTimeZone };
   }
   if (info.resolution === "host_fallback") {
     return {

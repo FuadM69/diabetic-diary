@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { FoodProduct } from "@/lib/types/food";
 import {
   getDisplayProductName,
@@ -22,7 +22,7 @@ function filterProductsByQuery(
     return products;
   }
   return products.filter((p) => {
-    if (p.name.toLowerCase().includes(t)) {
+    if (getDisplayProductName(p.name).toLowerCase().includes(t)) {
       return true;
     }
     if (p.brand && p.brand.toLowerCase().includes(t)) {
@@ -82,6 +82,8 @@ export function MealItemsEditor({
   initialItems,
 }: MealItemsEditorProps) {
   const baseId = useId();
+  const selectRefs = useRef<Record<string, HTMLSelectElement | null>>({});
+  const [activeRowId, setActiveRowId] = useState<string | null>(null);
   const [rows, setRows] = useState<Row[]>(() => {
     if (initialItems && initialItems.length > 0) {
       return initialItems.map((it) => ({ id: it.key }));
@@ -112,13 +114,32 @@ export function MealItemsEditor({
     filteredProducts.length === 0 &&
     productQuery.trim() !== "";
 
+  const suggestionProducts = useMemo(
+    () => filteredProducts.slice(0, 8),
+    [filteredProducts]
+  );
+
+  useEffect(() => {
+    if (rows.length === 0) {
+      setActiveRowId(null);
+      return;
+    }
+    if (activeRowId == null || !rows.some((r) => r.id === activeRowId)) {
+      setActiveRowId(rows[0]!.id);
+    }
+  }, [rows, activeRowId]);
+
   const rowDefaults =
     initialItems && initialItems.length > 0 ?
       new Map(initialItems.map((it) => [it.key, it]))
     : null;
 
   const addRow = () => {
-    setRows((prev) => [...prev, { id: newRowId() }]);
+    setRows((prev) => {
+      const next = [...prev, { id: newRowId() }];
+      setActiveRowId(next[next.length - 1]!.id);
+      return next;
+    });
   };
 
   const removeRow = (id: string) => {
@@ -190,9 +211,38 @@ export function MealItemsEditor({
           />
         </label>
         <p className="mt-1.5 text-[0.7rem] leading-snug text-white/45">
-          Сужает список в каждой строке «Продукт» ниже. Без запроса показаны все
-          позиции выбранного раздела.
+          Сужает список в каждой строке «Продукт» ниже. Подсказки подставляют
+          выбор в строку, с которой вы недавно работали (фокус на списке).
         </p>
+        {suggestionProducts.length > 0 ? (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {suggestionProducts.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                disabled={disabled}
+                onClick={() => {
+                  const rowId =
+                    activeRowId ?? rows[0]?.id ??
+                    null;
+                  if (!rowId) {
+                    return;
+                  }
+                  const el = selectRefs.current[rowId];
+                  if (!el) {
+                    return;
+                  }
+                  el.value = p.id;
+                  el.dispatchEvent(new Event("change", { bubbles: true }));
+                }}
+                className="max-w-full truncate rounded-full border border-white/15 bg-white/[0.07] px-2.5 py-1 text-left text-[0.7rem] text-white/85 hover:bg-white/[0.12] disabled:opacity-50"
+              >
+                {getDisplayProductName(p.name)}
+                {p.brand ? ` · ${p.brand}` : ""}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {showNoResults ? (
@@ -219,9 +269,13 @@ export function MealItemsEditor({
                   <label className="block text-xs text-white/55">
                     Продукт #{index + 1}
                     <select
+                      ref={(el) => {
+                        selectRefs.current[row.id] = el;
+                      }}
                       name="food_product_id"
                       disabled={disabled}
                       defaultValue={preset?.foodProductId ?? ""}
+                      onFocus={() => setActiveRowId(row.id)}
                       className={selectClass}
                     >
                       <option value="">

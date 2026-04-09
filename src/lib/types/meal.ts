@@ -30,6 +30,7 @@ export const MEAL_TYPE_KEYS = [
   "lunch",
   "dinner",
   "snack",
+  "drink_only",
 ] as const;
 
 export type MealTypeKey = (typeof MEAL_TYPE_KEYS)[number];
@@ -39,6 +40,7 @@ export const MEAL_TYPE_LABEL_RU: Record<MealTypeKey, string> = {
   lunch: "Обед",
   dinner: "Ужин",
   snack: "Перекус",
+  drink_only: "Отдельный напиток",
 };
 
 export type MealCreateItemInput = {

@@ -140,6 +140,49 @@ export async function updateFoodProduct(
   return { ok: true, row: data as FoodProduct };
 }
 
+export async function deleteFoodProduct(
+  userId: string,
+  productId: string
+): Promise<CreateFoodProductResult> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("food_products")
+    .delete()
+    .eq("id", productId)
+    .eq("created_by", userId)
+    .select(
+      "id, name, brand, carbs_per_100g, calories_per_100g, protein_per_100g, fat_per_100g, created_by, is_public"
+    )
+    .maybeSingle();
+
+  if (error) {
+    const msg = error.message?.toLowerCase() ?? "";
+    if (
+      error.code === "23503" ||
+      msg.includes("foreign key") ||
+      msg.includes("violates foreign key")
+    ) {
+      return {
+        ok: false,
+        errorMessage:
+          "Продукт уже указан в приёмах пищи — удалить нельзя. Отредактируйте или удалите эти приёмы.",
+      };
+    }
+    return { ok: false, errorMessage: error.message };
+  }
+
+  if (!data) {
+    return {
+      ok: false,
+      errorMessage:
+        "Продукт не найден или нет прав на удаление (общий каталог удалять нельзя).",
+    };
+  }
+
+  return { ok: true, row: data as FoodProduct };
+}
+
 /** Products visible to the user (public or own), subset by ids. */
 export async function getFoodProductsByIdsForUser(
   userId: string,

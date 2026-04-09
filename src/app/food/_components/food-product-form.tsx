@@ -62,6 +62,7 @@ export function FoodProductForm({ formKey }: FoodProductFormProps) {
         />
       </label>
 
+      <input type="hidden" name="is_drink" value="0" />
       <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/75">
         <input
           type="checkbox"

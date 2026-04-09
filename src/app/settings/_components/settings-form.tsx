@@ -166,13 +166,14 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
           </p>
         </div>
 
-        <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-          <p className="text-xs font-medium uppercase tracking-wide text-white/55">
-            По времени суток (необязательно)
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-white/45">
-            Заполняйте только если коэффициенты реально отличаются по времени.
-            Пустые поля автоматически берут общий fallback выше.
+        <details className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+          <summary className="cursor-pointer list-none text-xs font-medium uppercase tracking-wide text-white/55 [&::-webkit-details-marker]:hidden">
+            Уточнения по времени суток (необяз.){" "}
+            <span className="font-normal text-white/35">▼</span>
+          </summary>
+          <p className="mt-2 text-xs leading-relaxed text-white/45">
+            Только если УК/чувствительность реально отличаются. Пустые поля берут
+            общий fallback выше.
           </p>
           <div className="mt-3 space-y-3">
             <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
@@ -303,24 +304,24 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
               </div>
             </div>
           </div>
-        </div>
+        </details>
       </section>
 
       <section className={SURFACE_CARD}>
         <h2 className="text-base font-medium text-white">Часовой пояс</h2>
         <p className="mt-1 text-xs text-white/50">
-          Лучше IANA: <span className="text-white/65">Europe/Moscow</span>. Можно{" "}
-          <span className="text-white/65">UTC+3</span> /{" "}
-          <span className="text-white/65">GMT+3</span> — приложение приведёт к фиксированному
-          поясу Etc/GMT-*.
+          Если поле пустое, даты и формы используют системный пояс сервера (
+          <span className="text-white/65">обычно UTC</span> в облаке). Задайте
+          IANA — например, <span className="text-white/65">Europe/Moscow</span> или{" "}
+          <span className="text-white/65">UTC+3</span>.
         </p>
-        <label className="mt-4 block text-sm text-white/70">
-          Часовой пояс
+        <label className="mt-3 block text-sm text-white/70">
+          Явный пояс (необязательно)
           <input
             name="timezone"
             type="text"
             disabled={isPending}
-            placeholder="Europe/Moscow"
+            placeholder="Оставьте пустым для fallback"
             defaultValue={tzStr}
             maxLength={64}
             className={inputClass}

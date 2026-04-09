@@ -19,12 +19,44 @@ const DRINK_KEYWORDS = [
   "энергет",
 ];
 
+/** Substrings that must not match inside longer words (e.g. «руккола» contains «кола»). */
+const DRINK_KEYWORDS_WHOLE_TOKEN = new Set([
+  "drink",
+  "сок",
+  "чай",
+  "коф",
+  "кола",
+]);
+
+function escapeForUnicodePropertyClass(s: string): string {
+  return s.replace(/[\^$\\.*+?()[\]{}|]/g, "\\$&");
+}
+
+/**
+ * True if `keyword` appears as its own token — not as a substring of a longer letter run
+ * (Latin or Cyrillic letters).
+ */
+function wholeLetterTokenHasKeyword(text: string, keyword: string): boolean {
+  const k = escapeForUnicodePropertyClass(keyword.toLowerCase());
+  const re = new RegExp(`(?<![\\p{L}])${k}(?![\\p{L}])`, "iu");
+  return re.test(text);
+}
+
 function hasDrinkKeyword(value: string): boolean {
   const t = value.trim().toLowerCase();
   if (!t) {
     return false;
   }
-  return DRINK_KEYWORDS.some((keyword) => t.includes(keyword));
+  for (const keyword of DRINK_KEYWORDS) {
+    if (DRINK_KEYWORDS_WHOLE_TOKEN.has(keyword)) {
+      if (wholeLetterTokenHasKeyword(t, keyword)) {
+        return true;
+      }
+    } else if (t.includes(keyword)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export function isDrinkName(name: string): boolean {

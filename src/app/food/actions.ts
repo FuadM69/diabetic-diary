@@ -1,7 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createFoodProduct, updateFoodProduct } from "@/lib/db/food";
+import {
+  createFoodProduct,
+  deleteFoodProduct,
+  updateFoodProduct,
+} from "@/lib/db/food";
 import { createClient } from "@/lib/supabase/server";
 import {
   parseFoodProductForm,
@@ -50,6 +54,41 @@ export async function createFoodProductAction(
   }
 
   revalidatePath("/food");
+  return { success: true, error: null };
+}
+
+export async function deleteFoodProductAction(
+  formData: FormData
+): Promise<FoodActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return {
+      success: false,
+      error: "Нужно войти в аккаунт.",
+    };
+  }
+
+  const rawId = formData.get("productId");
+  if (rawId === null || typeof rawId !== "string" || rawId.trim() === "") {
+    return { success: false, error: "Не указан продукт." };
+  }
+  const productId = rawId.trim();
+
+  const result = await deleteFoodProduct(user.id, productId);
+  if (!result.ok) {
+    return {
+      success: false,
+      error: result.errorMessage || "Не удалось удалить продукт.",
+    };
+  }
+
+  revalidatePath("/food");
+  revalidatePath("/meals");
   return { success: true, error: null };
 }
 

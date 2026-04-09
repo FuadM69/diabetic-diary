@@ -136,7 +136,8 @@ export function parseFoodProductForm(
     return { ok: false, message: fatP.message };
   }
 
-  const isDrink = formData.get("is_drink") === "1";
+  const drinkFlags = formData.getAll("is_drink");
+  const isDrink = drinkFlags.some((v) => v === "1");
   const normalizedName = withDrinkMarker(nameP.value, isDrink);
   if (normalizedName.length > NAME_MAX) {
     return {

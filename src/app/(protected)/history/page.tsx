@@ -12,6 +12,10 @@ import {
 import { formatUtcIsoForUserDisplay } from "@/lib/utils/datetime-local-tz";
 import { getDisplayProductName } from "@/lib/utils/food-product-kind";
 import { formatGlucoseValue } from "@/lib/utils/glucose";
+import {
+  readZonedWallClockParts,
+  resolveLogRangeTimeZone,
+} from "@/lib/utils/log-range-bounds";
 import { sumCaloriesFromItems, sumCarbsFromItems } from "@/lib/utils/meal-nutrition";
 import { INSULIN_ENTRY_TYPE_LABEL_RU } from "@/lib/utils/insulin";
 
@@ -68,6 +72,46 @@ function buildTimeline(
   return timelineItems;
 }
 
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function userDaySortKey(iso: string, ianaTimeZone: string): string {
+  const p = readZonedWallClockParts(new Date(iso), ianaTimeZone);
+  return `${p.year}-${pad2(p.month)}-${pad2(p.day)}`;
+}
+
+function groupTimelineByUserCalendarDay(
+  items: TimelineItem[],
+  savedTimezone: string | null
+): { dayLabel: string; dayKey: string; items: TimelineItem[] }[] {
+  const zone = resolveLogRangeTimeZone(savedTimezone);
+  const byDay = new Map<string, TimelineItem[]>();
+  for (const item of items) {
+    const dayKey = userDaySortKey(item.occurredAt, zone);
+    const list = byDay.get(dayKey);
+    if (list) {
+      list.push(item);
+    } else {
+      byDay.set(dayKey, [item]);
+    }
+  }
+  const groups = [...byDay.entries()].map(([dayKey, dayItems]) => ({
+    dayKey,
+    dayLabel: formatUtcIsoForUserDisplay(dayItems[0]!.occurredAt, savedTimezone, {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }),
+    items: dayItems.sort((a, b) =>
+      b.occurredAt.localeCompare(a.occurredAt)
+    ),
+  }));
+  groups.sort((a, b) => b.dayKey.localeCompare(a.dayKey));
+  return groups;
+}
+
 export default async function HistoryPage() {
   const user = await getCurrentUser();
   if (!user) {
@@ -82,6 +126,10 @@ export default async function HistoryPage() {
   ]);
 
   const timeline = buildTimeline(glucoseEntries, mealEntries, insulinEntries);
+  const timelineByDay = groupTimelineByUserCalendarDay(
+    timeline,
+    settings.timezone
+  );
   const linkedBolusByMealId = new Map<string, number>();
   for (const e of insulinEntries) {
     if (e.entry_type !== "bolus") {
@@ -112,8 +160,32 @@ export default async function HistoryPage() {
             </p>
           </section>
         ) : (
-          <div className="space-y-3.5">
-            {timeline.map((item) => {
+          <div className="space-y-4">
+            {timelineByDay.map((group, groupIndex) => (
+              <details
+                key={group.dayKey}
+                className="group rounded-3xl border border-white/10 bg-white/[0.02] open:bg-white/[0.03]"
+                open={groupIndex < 2}
+              >
+                <summary className="cursor-pointer list-none px-4 py-3 [&::-webkit-details-marker]:hidden">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium text-white/88">
+                      {group.dayLabel}
+                    </span>
+                    <span className="text-[0.65rem] text-white/45">
+                      {group.items.length}{" "}
+                      {group.items.length === 1 ? "запись" : "записей"}
+                      <span className="ml-1 text-white/35 group-open:hidden">
+                        ▼
+                      </span>
+                      <span className="ml-1 hidden text-white/35 group-open:inline">
+                        ▲
+                      </span>
+                    </span>
+                  </div>
+                </summary>
+                <div className="space-y-3.5 border-t border-white/10 px-3 pb-3 pt-3">
+                  {group.items.map((item) => {
               if (item.type === "glucose") {
                 return (
                   <section
@@ -220,10 +292,10 @@ export default async function HistoryPage() {
               return (
                 <section
                   key={item.id}
-                  className="rounded-3xl border border-violet-500/25 bg-violet-500/[0.06] p-4"
+                  className="rounded-3xl border border-zinc-400/20 bg-zinc-500/[0.06] p-4"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <p className="inline-flex rounded-full border border-violet-400/35 bg-violet-400/12 px-2.5 py-0.5 text-[0.65rem] font-medium uppercase tracking-wide text-violet-100/90">
+                    <p className="inline-flex rounded-full border border-zinc-400/28 bg-zinc-400/10 px-2.5 py-0.5 text-[0.65rem] font-medium uppercase tracking-wide text-zinc-100/90">
                       Инсулин
                     </p>
                     <p className="shrink-0 tabular-nums text-[0.72rem] text-white/55">
@@ -253,7 +325,10 @@ export default async function HistoryPage() {
                   ) : null}
                 </section>
               );
-            })}
+                  })}
+                </div>
+              </details>
+            ))}
           </div>
         )}
       </div>

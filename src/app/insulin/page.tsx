@@ -18,6 +18,7 @@ import {
 } from "@/lib/utils/insulin-form";
 import { InsulinForm } from "./_components/insulin-form";
 import { InsulinList } from "./_components/insulin-list";
+import { InsulinFilterHint } from "./_components/insulin-filter-hint";
 import { InsulinRangeFilter } from "./_components/insulin-range-filter";
 import {
   INTRO_TEXT,
@@ -80,26 +81,20 @@ export default async function InsulinPage({ searchParams }: InsulinPageProps) {
         <header className="space-y-3">
           <InsulinRangeFilter activeRange={range} />
           {range !== "all" && takenAtGte ? (
-            <p
-              className="rounded-2xl border border-amber-500/25 bg-amber-950/20 px-3 py-2 text-xs leading-relaxed text-amber-50/90"
-              role="note"
-            >
-              <strong className="font-medium text-amber-100">
-                Список обрезан фильтром «{GLUCOSE_RANGE_LABEL[range]}»
-              </strong>
-              . Показываются только введения <strong>не раньше</strong> этой
-              отметки (время введения, как в настройках профиля):{" "}
-              <span className="tabular-nums font-semibold text-white">
-                {formatUtcIsoForUserDisplay(takenAtGte, settings.timezone, {
+            <InsulinFilterHint
+              range={range}
+              rangeLabel={GLUCOSE_RANGE_LABEL[range]}
+              takenAtGteDisplay={formatUtcIsoForUserDisplay(
+                takenAtGte,
+                settings.timezone,
+                {
                   dateStyle: "medium",
                   hour: "2-digit",
                   minute: "2-digit",
                   hour12: false,
-                })}
-              </span>
-              . Более старые записи в таблице не скрыты навсегда — выберите
-              период «Всё время», чтобы увидеть полный журнал.
-            </p>
+                }
+              )}
+            />
           ) : null}
           <p className={INTRO_TEXT}>
             Журнал введений: базальный, болюс и коррекция. Запись здесь не

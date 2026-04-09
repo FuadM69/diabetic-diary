@@ -1,19 +1,17 @@
 import Link from "next/link";
-import type { GlucoseEntry, GlucoseStats, UserSettings } from "@/lib/types/glucose";
+import type { GlucoseEntry, GlucoseStats } from "@/lib/types/glucose";
 import { formatUtcIsoForUserDisplay } from "@/lib/utils/datetime-local-tz";
 import { formatGlucoseValue } from "@/lib/utils/glucose";
 
 type DashboardTodaySectionProps = {
   latest: GlucoseEntry;
   todayStats: GlucoseStats;
-  settings: UserSettings;
   userTimezone: string | null;
 };
 
 export function DashboardTodaySection({
   latest,
   todayStats,
-  settings,
   userTimezone,
 }: DashboardTodaySectionProps) {
   const readingsToday = todayStats.isEmpty ? 0 : todayStats.totalCount;
@@ -67,13 +65,6 @@ export function DashboardTodaySection({
             })}
           </p>
         </div>
-      </div>
-
-      <div className="rounded-3xl border border-white/10 bg-white/[0.04] px-4 py-3">
-        <p className="text-xs text-white/45">Целевой диапазон</p>
-        <p className="mt-1 tabular-nums text-sm font-medium text-white/90">
-          {settings.glucose_target_min}–{settings.glucose_target_max}
-        </p>
       </div>
     </section>
   );

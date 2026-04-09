@@ -17,6 +17,10 @@ import {
   FEEDBACK_ERROR,
   FEEDBACK_SUCCESS,
 } from "@/lib/ui/page-patterns";
+import {
+  extractLinkedMealIdFromInsulinNote,
+  stripLinkedMealMarkerFromInsulinNote,
+} from "@/lib/utils/bolus-prefill";
 
 const initial: InsulinActionResult = { success: false, error: null };
 
@@ -98,6 +102,15 @@ export function InsulinForm({
   const combinedError =
     timezoneConfigError || browserValidationError || state.error;
 
+  const prefillMealId =
+    queryPrefill?.note ?
+      extractLinkedMealIdFromInsulinNote(queryPrefill.note)
+    : null;
+  const prefillNoteVisible =
+    queryPrefill?.note ?
+      (stripLinkedMealMarkerFromInsulinNote(queryPrefill.note) ?? queryPrefill.note)
+    : "";
+
   return (
     <form
       action={formAction}
@@ -131,6 +144,9 @@ export function InsulinForm({
         }
       }}
     >
+      {prefillMealId ? (
+        <input type="hidden" name="linked_meal_id" value={prefillMealId} />
+      ) : null}
       {prefillFromBolusFlow && !state.success ? (
         <div
           className="rounded-2xl border border-sky-500/30 bg-sky-950/25 px-3 py-2.5 text-xs leading-relaxed text-sky-100/90"
@@ -231,7 +247,7 @@ export function InsulinForm({
           name="note"
           rows={2}
           disabled={disabled}
-          defaultValue={queryPrefill?.note ?? ""}
+          defaultValue={prefillNoteVisible}
           placeholder="комментарий к введению"
           className={`${inputClass} resize-none`}
         />

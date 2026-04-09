@@ -12,6 +12,10 @@ import { useFormStatus } from "react-dom";
 import type { GlucoseRangeKey } from "@/lib/types/glucose";
 import { INSULIN_ENTRY_TYPES, type InsulinEntry } from "@/lib/types/insulin";
 import {
+  extractLinkedMealIdFromInsulinNote,
+  stripLinkedMealMarkerFromInsulinNote,
+} from "@/lib/utils/bolus-prefill";
+import {
   formatUtcIsoForUserDisplay,
   utcIsoToDatetimeLocalInUserTimezone,
 } from "@/lib/utils/datetime-local-tz";
@@ -102,9 +106,14 @@ function EditFormBody({
     takenAtParsed.ok,
   ]);
 
+  const linkedMealId = extractLinkedMealIdFromInsulinNote(entry.note);
+
   return (
     <form action={formAction} className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
       <input type="hidden" name="entryId" value={entry.id} />
+      {linkedMealId ? (
+        <input type="hidden" name="linked_meal_id" value={linkedMealId} />
+      ) : null}
 
       {editSaved && state.savedEntryTypeLabel && state.savedTakenAtDisplay ? (
         <div className="space-y-3">
@@ -234,7 +243,9 @@ function EditFormBody({
               id={`insulin-note-${entry.id}`}
               name="note"
               rows={2}
-              defaultValue={entry.note ?? ""}
+              defaultValue={
+                stripLinkedMealMarkerFromInsulinNote(entry.note) ?? ""
+              }
               disabled={isPending || blockEdit}
               className={`${inputClass} resize-none`}
             />

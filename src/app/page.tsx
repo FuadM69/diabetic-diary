@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { LogRangeFilter } from "@/components/filters/log-range-filter";
@@ -15,6 +16,7 @@ import { GlucoseStats } from "./glucose/_components/glucose-stats";
 import { DashboardGreeting } from "./_components/dashboard/dashboard-greeting";
 import { DashboardOnboarding } from "./_components/dashboard/dashboard-onboarding";
 import { DashboardQuickActions } from "./_components/dashboard/dashboard-quick-actions";
+import { DashboardRefreshButton } from "./_components/dashboard/dashboard-refresh-button";
 import { DashboardTodaySection } from "./_components/dashboard/dashboard-today-section";
 import {
   filterGlucoseEntriesMeasuredAtGte,
@@ -89,7 +91,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const chartPoints = mapGlucoseEntriesToChartPoints(chartEntries, settings);
 
   const isOnboarding = latest === null;
-  const todayEvents: TodayEvent[] = [
+  const todayEventsAll: TodayEvent[] = [
     ...todayEntries.map((entry) => ({
       id: `g-${entry.id}`,
       whenIso: entry.measured_at,
@@ -111,9 +113,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       label: INSULIN_ENTRY_TYPE_LABEL_RU[entry.entry_type],
       value: `${entry.units} ед.`,
     })),
-  ]
-    .sort((a, b) => b.whenIso.localeCompare(a.whenIso))
-    .slice(0, 8);
+  ].sort((a, b) => b.whenIso.localeCompare(a.whenIso));
+  const todayEvents = todayEventsAll.slice(0, 3);
+  const moreTodayCount = Math.max(0, todayEventsAll.length - todayEvents.length);
 
   return (
     <AppShell title="Главная">
@@ -124,10 +126,13 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <DashboardOnboarding />
         ) : (
           <>
+            <div className="flex justify-end">
+              <DashboardRefreshButton />
+            </div>
+
             <DashboardTodaySection
               latest={latest}
               todayStats={todayStats}
-              settings={settings}
               userTimezone={settings.timezone}
             />
 
@@ -155,7 +160,15 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             </section>
 
             <section className="space-y-2">
-              <h3 className={SECTION_TITLE}>Последние события сегодня</h3>
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h3 className={SECTION_TITLE}>Сегодня кратко</h3>
+                <Link
+                  href="/history"
+                  className="text-xs text-white/50 underline decoration-white/20 underline-offset-2 hover:text-white/75"
+                >
+                  Полная история
+                </Link>
+              </div>
               {todayEvents.length === 0 ? (
                 <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/55">
                   За сегодня пока нет событий.
@@ -182,6 +195,18 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   ))}
                 </ul>
               )}
+              {moreTodayCount > 0 ? (
+                <p className="text-center text-[0.7rem] text-white/45">
+                  И ещё {moreTodayCount} — в{" "}
+                  <Link
+                    href="/history"
+                    className="text-white/65 underline decoration-white/25 underline-offset-2"
+                  >
+                    истории
+                  </Link>
+                  .
+                </p>
+              ) : null}
             </section>
           </>
         )}

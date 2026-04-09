@@ -1,4 +1,6 @@
+import { extractLinkedMealIdFromInsulinNote } from "@/lib/utils/bolus-prefill";
 import { datetimeLocalInUserTimezoneToUtcIso } from "@/lib/utils/datetime-local-tz";
+import { insulinNoteWithOptionalMealLink } from "@/lib/utils/insulin-meal-link-note";
 import { parseGlucoseEntryId } from "@/lib/utils/glucose";
 import {
   INSULIN_ENTRY_TYPES,
@@ -138,6 +140,17 @@ function parseInsulinFormFields(
     return { ok: false, message: unitsParsed.message };
   }
 
+  const noteBody = normalizeOptionalText(formData.get("note"));
+  const linkRaw = formData.get("linked_meal_id");
+  const linkFromField =
+    typeof linkRaw === "string" && linkRaw.trim().length > 0 ?
+      linkRaw.trim()
+    : null;
+  const linkFromNote =
+    noteBody != null ? extractLinkedMealIdFromInsulinNote(noteBody) : null;
+  const linkedMealId = linkFromField ?? linkFromNote;
+  const note = insulinNoteWithOptionalMealLink(noteBody, linkedMealId);
+
   return {
     ok: true,
     data: {
@@ -145,7 +158,7 @@ function parseInsulinFormFields(
       entry_type: typeParsed.value,
       units: unitsParsed.value,
       insulin_name: normalizeOptionalText(formData.get("insulin_name")),
-      note: normalizeOptionalText(formData.get("note")),
+      note,
     },
   };
 }
