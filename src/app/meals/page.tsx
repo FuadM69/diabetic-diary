@@ -8,12 +8,7 @@ import { extractLinkedMealIdFromInsulinNote } from "@/lib/utils/bolus-prefill";
 import { formatDatetimeLocalValue } from "@/lib/utils/datetime-local";
 import { MealForm } from "./_components/meal-form";
 import { MealList } from "./_components/meal-list";
-import {
-  INTRO_TEXT,
-  PAGE_CONTAINER,
-  SECTION_TITLE,
-  SURFACE_CARD,
-} from "@/lib/ui/page-patterns";
+import { SECTION_TITLE, SURFACE_CARD } from "@/lib/ui/page-patterns";
 
 export default async function MealsPage() {
   const user = await getCurrentUser();
@@ -46,11 +41,11 @@ export default async function MealsPage() {
 
   return (
     <AppShell title="Еда">
-      <div className={PAGE_CONTAINER}>
-        <p className={INTRO_TEXT}>
-          Записывайте приёмы пищи из каталога — углеводы и калории считаются по
-          весу порции. Первый раз откройте «Продукты», если нужно добавить свои
-          позиции; в общем каталоге уже есть базовые продукты.
+      <div className="mx-auto w-full max-w-lg space-y-3 pb-4 sm:space-y-5">
+        <p className="text-xs leading-snug text-white/60 sm:text-sm sm:leading-relaxed">
+          Приём из <span className="text-white/75">вашего списка</span> продуктов:
+          УВ и ккал по граммам порции. Добавляйте и правьте позиции в разделе
+          «Продукты».
         </p>
 
         <section

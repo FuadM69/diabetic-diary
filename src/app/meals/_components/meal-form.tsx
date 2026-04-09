@@ -214,12 +214,6 @@ export function MealForm({ products, formKey, defaultEatenAt }: MealFormProps) {
       onInput={syncDraftFromForm}
       onChange={syncDraftFromForm}
     >
-      <p className="text-xs leading-relaxed text-white/45">
-        После сохранения можно перейти к оценке болюса с подставленными углеводами.
-        Глюкозу и итоговую дозу вы указываете и проверяете сами — запись в журнал
-        инсулина не создаётся автоматически.
-      </p>
-
       <div className="space-y-2">
         <label htmlFor={eatenId} className="block text-sm text-white/70">
           Когда съедено
@@ -311,6 +305,18 @@ export function MealForm({ products, formKey, defaultEatenAt }: MealFormProps) {
       ) : null}
 
       <SubmitButton />
+
+      <details className="rounded-2xl border border-white/10 bg-white/[0.02] px-3 py-2 sm:px-3.5">
+        <summary className="cursor-pointer list-none text-xs text-white/50 [&::-webkit-details-marker]:hidden">
+          Про болюс и запись инсулина{" "}
+          <span className="font-normal text-white/35">▼</span>
+        </summary>
+        <p className="mt-2 text-xs leading-relaxed text-white/45">
+          После сохранения приёма можно открыть помощник болюса с уже
+          подставленными углеводами. Глюкозу и дозу вы вводите и проверяете
+          сами; запись инсулина в журнал приложение не создаёт автоматически.
+        </p>
+      </details>
     </form>
   );
 }
