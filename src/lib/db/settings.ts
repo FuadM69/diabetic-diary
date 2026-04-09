@@ -10,6 +10,38 @@ import { createClient } from "@/lib/supabase/server";
 
 const DEFAULT_GLUCOSE_MIN = 5.0;
 const DEFAULT_GLUCOSE_MAX = 7.0;
+const SETTINGS_SELECT_LEGACY =
+  "glucose_target_min, glucose_target_max, carb_ratio, insulin_sensitivity, timezone";
+const SETTINGS_SELECT_FULL =
+  "glucose_target_min, glucose_target_max, carb_ratio, insulin_sensitivity, carb_ratio_morning, carb_ratio_day, carb_ratio_evening, carb_ratio_night, insulin_sensitivity_morning, insulin_sensitivity_day, insulin_sensitivity_evening, insulin_sensitivity_night, timezone";
+
+function isMissingTimeOfDaySettingsColumnsError(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+  const code =
+    "code" in error && typeof error.code === "string" ? error.code : null;
+  const message =
+    "message" in error && typeof error.message === "string"
+      ? error.message.toLowerCase()
+      : "";
+  if (code === "42703") {
+    return true;
+  }
+  if (!message.includes("column")) {
+    return false;
+  }
+  return (
+    message.includes("carb_ratio_morning") ||
+    message.includes("carb_ratio_day") ||
+    message.includes("carb_ratio_evening") ||
+    message.includes("carb_ratio_night") ||
+    message.includes("insulin_sensitivity_morning") ||
+    message.includes("insulin_sensitivity_day") ||
+    message.includes("insulin_sensitivity_evening") ||
+    message.includes("insulin_sensitivity_night")
+  );
+}
 
 function normalizeRow(data: Record<string, unknown> | null): UserSettings {
   if (!data) {
@@ -112,19 +144,31 @@ function normalizeRow(data: Record<string, unknown> | null): UserSettings {
 export async function getUserSettings(userId: string): Promise<UserSettings> {
   const supabase = await createClient();
 
-  const { data, error } = await supabase
+  const full = await supabase
     .from("user_settings")
-    .select(
-      "glucose_target_min, glucose_target_max, carb_ratio, insulin_sensitivity, carb_ratio_morning, carb_ratio_day, carb_ratio_evening, carb_ratio_night, insulin_sensitivity_morning, insulin_sensitivity_day, insulin_sensitivity_evening, insulin_sensitivity_night, timezone"
-    )
+    .select(SETTINGS_SELECT_FULL)
     .eq("user_id", userId)
     .maybeSingle();
 
-  if (error) {
-    throw error;
+  if (!full.error) {
+    return normalizeRow(full.data as Record<string, unknown> | null);
   }
 
-  return normalizeRow(data as Record<string, unknown> | null);
+  if (!isMissingTimeOfDaySettingsColumnsError(full.error)) {
+    throw full.error;
+  }
+
+  const legacy = await supabase
+    .from("user_settings")
+    .select(SETTINGS_SELECT_LEGACY)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (legacy.error) {
+    throw legacy.error;
+  }
+
+  return normalizeRow(legacy.data as Record<string, unknown> | null);
 }
 
 export type UserSettingsUpdatePayload = {
@@ -170,19 +214,45 @@ export async function updateUserSettings(
     timezone: patch.timezone,
   };
 
-  const { data, error } = await supabase
+  const full = await supabase
     .from("user_settings")
     .upsert(row, { onConflict: "user_id" })
-    .select(
-      "glucose_target_min, glucose_target_max, carb_ratio, insulin_sensitivity, carb_ratio_morning, carb_ratio_day, carb_ratio_evening, carb_ratio_night, insulin_sensitivity_morning, insulin_sensitivity_day, insulin_sensitivity_evening, insulin_sensitivity_night, timezone"
-    )
+    .select(SETTINGS_SELECT_FULL)
     .maybeSingle();
 
-  if (error) {
-    return { ok: false, errorMessage: error.message };
+  if (!full.error && full.data) {
+    return {
+      ok: true,
+      settings: normalizeRow(full.data as Record<string, unknown>),
+    };
   }
 
-  if (!data) {
+  if (
+    full.error &&
+    !isMissingTimeOfDaySettingsColumnsError(full.error)
+  ) {
+    return { ok: false, errorMessage: full.error.message };
+  }
+
+  const legacyRow = {
+    user_id: userId,
+    glucose_target_min: patch.glucose_target_min,
+    glucose_target_max: patch.glucose_target_max,
+    carb_ratio: patch.carb_ratio,
+    insulin_sensitivity: patch.insulin_sensitivity,
+    timezone: patch.timezone,
+  };
+  const legacy = await supabase
+    .from("user_settings")
+    .upsert(legacyRow, { onConflict: "user_id" })
+    .select(SETTINGS_SELECT_LEGACY)
+    .maybeSingle();
+
+  if (legacy.error) {
+    return { ok: false, errorMessage: legacy.error.message };
+  }
+
+  if (!legacy.data) {
     return {
       ok: false,
       errorMessage:
@@ -190,5 +260,8 @@ export async function updateUserSettings(
     };
   }
 
-  return { ok: true, settings: normalizeRow(data as Record<string, unknown>) };
+  return {
+    ok: true,
+    settings: normalizeRow(legacy.data as Record<string, unknown>),
+  };
 }
