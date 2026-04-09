@@ -1,6 +1,0 @@
-fix: meals mobile layout overflow and width handling
-
-- constrain page and form containers with min-w-0, max-w-full, overflow-x-clip
-- wrap datetime-local and tighten field widths for narrow screens
-- fix product row flex min-width and autocomplete dropdown bounds
-- use ring-inset for active row; simplify hidden select to sr-only
